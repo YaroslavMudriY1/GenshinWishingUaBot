@@ -16,6 +16,9 @@ namespace TelegramUI.Commands
 {
     public static class Inventory
     {
+       // private static int lastFiveStarPity = 0;
+       // private static int lastFourStarPity = 0;
+       
         internal static string InventoryFetch(Message message)
         {
             var result = new string[3];
@@ -119,21 +122,50 @@ namespace TelegramUI.Commands
             result[1] = resultCharacters[1] + resultWeapons[1];
             result[2] = resultCharacters[2] + resultWeapons[2];
 
-            if (result[0] != "")
+           if (result[0] != "")
             {
                 resultArray[0] = $"\U00002b50\U00002b50\U00002b50\U00002b50\U00002b50 ({itemStarCount[0]})\n{result[0]}";
-                resultArray[0] = resultArray[0].Substring(0,  resultArray[0].Length - 2) + "\n\n";
+                resultArray[0] = resultArray[0].Substring(0, resultArray[0].Length - 2) + "\n\n";
+                //resultArray[0] += $"Last 5* Pity: {lastFiveStarPity}\n";
             }
             if (result[1] != "")
             {
                 resultArray[1] = $"\U00002b50\U00002b50\U00002b50\U00002b50 ({itemStarCount[1]})\n{result[1]}";
-                resultArray[1] = resultArray[1].Substring(0,  resultArray[1].Length - 2) + "\n\n";
+                resultArray[1] = resultArray[1].Substring(0, resultArray[1].Length - 2) + "\n\n";
+                //resultArray[1] += $"Last 4* Pity: {lastFourStarPity}\n";
             }
             if (result[2] != "")
             {
                 resultArray[2] = $"\U00002b50\U00002b50\U00002b50 ({itemStarCount[2]})\n{result[2]}";
-                resultArray[2] = resultArray[2].Substring(0,  resultArray[2].Length - 2) + "\n\n";
+                resultArray[2] = resultArray[2].Substring(0, resultArray[2].Length - 2) + "\n\n";
             }
+            // Check if the user hit pity counter
+using var dbCon = new SQLiteConnection(MainDb());
+dbCon.Open();
+
+using var dbCmd = new SQLiteCommand(dbCon);
+dbCmd.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
+dbCmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
+
+dbCmd.CommandText = "SELECT FourPity, FivePity From UsersInChats WHERE UserId = @user AND ChatId = @chat";
+using var dbRdr = dbCmd.ExecuteReader();
+
+// Зберігаємо значення Pity в локальні змінні
+int lastFiveStarPity = 0;
+int lastFourStarPity = 0;
+
+while (dbRdr.Read())
+{
+    lastFiveStarPity = dbRdr.GetInt32(1);
+    lastFourStarPity = dbRdr.GetInt32(0);
+}
+
+// Закриваємо з'єднання з базою даних
+dbCon.Close();
+
+            // Виводимо значення Pity
+resultArray[2] += $"Last 5* Pity: {lastFiveStarPity}\n";
+resultArray[2] += $"Last 4* Pity: {lastFourStarPity}\n";
 
             var results = resultArray[0] + resultArray[1] + resultArray[2];
             
@@ -150,5 +182,6 @@ namespace TelegramUI.Commands
 
             return results;
         }
+        
     }
 }

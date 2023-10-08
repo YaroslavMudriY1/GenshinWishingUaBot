@@ -8,54 +8,47 @@ using Timer = System.Threading.Timer;
 
 namespace TelegramUI.Scheduler
 {
-   public class TaskScheduler
-{
-    private List<Timer> Timers { get; } = new();
-    public static TaskScheduler Instance { get; } = new();
-    public static TaskScheduler QueueInstance { get; } = new();
-
-   private DateTime lastWishTime = DateTime.MinValue;
-    private static readonly int hoursInterval = 2; // Статичний інтервал в годинах
-
-    public void ScheduleTask(int hour, double hourInterval)
+    public class TaskScheduler
     {
-        var now = DateTime.Now;
+        private List<Timer> Timers { get; } = new();
+        public static TaskScheduler Instance { get; } = new();
+        public static TaskScheduler QueueInstance { get; } = new();
 
-        // Отримуємо наступний можливий час виклику "/wish" згідно із статичним інтервалом
-        var nextWishTime = lastWishTime.AddHours(2);
-
-        // Перевіряємо, чи маємо чекати до наступного можливого часу
-        if (now < nextWishTime)
+        public void ScheduleTask(int hour, double hourInterval)
         {
-            var timeLeft = nextWishTime - now;
+            var now = DateTime.Now;
+            var run = new DateTime(now.Year, now.Month, now.Day, hour, now.Minute, 0);
+            if (now > run)
+            {
+                run = run.AddHours(2);
+            }
+
+            var timeLeft = run - now;
+            if (timeLeft < TimeSpan.Zero)
+            {
+                timeLeft = TimeSpan.Zero;
+            }
 
             var timer = new Timer(_ =>
             {
                 DailyReset();
-            }, null, timeLeft, TimeSpan.FromHours(hoursInterval));
+            }, null, timeLeft, TimeSpan.FromHours(hourInterval)); ;
 
             Timers.Add(timer);
         }
-        else
+
+        private static void DailyReset()
         {
-            // Викликаємо DailyReset() відразу, якщо час минув
-            DailyReset();
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con)
+            {
+                CommandText = "UPDATE UsersInChats SET HasRolled = 0"
+            };
+            cmd.ExecuteNonQuery();
+
+            con.Close();
         }
     }
-    
-    private static void DailyReset()
-    {
-        using var con = new SQLiteConnection(MainDb());
-        con.Open();
-        
-        using var cmd = new SQLiteCommand(con)
-        {
-            CommandText = "UPDATE UsersInChats SET HasRolled = 0"
-        };
-        cmd.ExecuteNonQuery();
-        
-        con.Close();
-    }
-}
-
 }

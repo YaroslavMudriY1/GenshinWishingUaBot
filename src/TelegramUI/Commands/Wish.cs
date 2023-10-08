@@ -112,36 +112,25 @@ namespace TelegramUI.Commands
             var textsList = JsonSerializer.Deserialize<List<string>>(textsText);
             
             
-            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Stars, wish.Type);
+            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Stars, wish.Type,wish.TypeDesc);
 
             result[1] =
-                $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}.webp";
+                $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}.webp";
             
             if (wish.Id is "barbara" or "jean")
             {
-                result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-summer.webp";
+                result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-summer.webp";
             }
             
             if (wish.Id is "keqing" or "ningguang")
             {
-                result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-lanternrite.webp";
+                result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-lanternrite.webp";
             }
-            // if (wish.Id is "diluc")
-            //{
-            //    result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-lanternrite.webp";
-           // }
-                       // if (wish.Id is "lisa")
-            //{
-            //    result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-lanternrite.webp";
-           // }
-                       // if (wish.Id is "ayaka")
-            //{
-            //    result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-lanternrite.webp";
-           // }
-                       // if (wish.Id is "klee" or "kaeya")
-            //{
-            //    result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-lanternrite.webp";
-           // }
+             if (wish.Id is "diluc"or "ayaka" or "lisa" or "klee" or "kaeya"or "fischl")
+            {
+                result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-skin.webp";
+            }
+               
             
             return result;
         }
