@@ -128,7 +128,7 @@ namespace TelegramUI.Commands
             }
              if (wish.Id is "diluc"or "ayaka" or "lisa" or "klee" or "kaeya"or "fischl")
             {
-                result[1] = $"https://i0.wp.com/raw.githubusercontent.com/FrenzyYum/GenshinWishingBot/master/assets/images/{wish.Id}-skin.webp";
+                result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-skin.webp";
             }
                
             
