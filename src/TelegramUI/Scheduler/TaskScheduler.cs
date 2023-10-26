@@ -13,14 +13,22 @@ namespace TelegramUI.Scheduler
         private List<Timer> Timers { get; } = new();
         public static TaskScheduler Instance { get; } = new();
         public static TaskScheduler QueueInstance { get; } = new();
+        public static int LastRolledHour;
+        public static int LastRolledMinute;
 
+        public int LastRolledH() { return LastRolledHour; }
+        public int LastRolledM() { return LastRolledMinute; }
         public void ScheduleTask(int hour, double hourInterval)
         {
+            LastRolledHour = DateTime.Now.Hour;
+            LastRolledMinute=DateTime.Now.Minute;
             var now = DateTime.Now;
             var run = new DateTime(now.Year, now.Month, now.Day, hour, now.Minute, 0);
+            //TimeSpan 2hours = TimeSpan(2, 0, 0);
             if (now > run)
             {
-                run = run.AddHours(2);
+                run = run.AddHours(hourInterval);
+                //run += 2hours
             }
 
             var timeLeft = run - now;
@@ -32,10 +40,12 @@ namespace TelegramUI.Scheduler
             var timer = new Timer(_ =>
             {
                 DailyReset();
-            }, null, timeLeft, TimeSpan.FromHours(hourInterval)); ;
+            }, null, timeLeft, TimeSpan.FromHours(2)); ;
 
             Timers.Add(timer);
+
         }
+
 
         private static void DailyReset()
         {

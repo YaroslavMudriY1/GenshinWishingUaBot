@@ -12,6 +12,7 @@ using Telegram.Bot.Types.Enums;
 using TelegramUI.Commands;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
+using TelegramUI.Scheduler;
 
 namespace TelegramUI.Telegram
 {
@@ -134,11 +135,13 @@ catch (Exception exception)
                         }
                         break;
                     case "/wish":
+
                         if (Wish.HasRolled(e.Message) == 1)
                         {
                             // These fixed parameters depend on Main's ScheduleTask parameters, edit accordingly
-                            var minuteDiff = 60 - DateTime.Now.Minute;
-                            var hourDiff = 21 - DateTime.Now.Hour - 1;
+                            //right now, parametrs changed for every two hours wish
+                            var minuteDiff = (TaskScheduler.LastRolledMinute+60) - DateTime.Now.Minute;
+                            var hourDiff = (DateTime.Now.AddHours(1)).Hour - TaskScheduler.LastRolledHour;
                             if (minuteDiff == 60)
                             {
                                 hourDiff += 1;
@@ -152,7 +155,7 @@ catch (Exception exception)
 
                             if (minuteDiff == 0 && hourDiff == 0)
                             {
-                                hourDiff = 24;
+                                hourDiff = 2;
                             }
 
                             while (true)
@@ -170,10 +173,11 @@ catch (Exception exception)
                                     // ignored
                                 }
                             }
-                            
+
                             return;
                         }
-                        
+
+
                         var pull = Wish.GetCharacterPull(e.Message);
 
                         while (true)
