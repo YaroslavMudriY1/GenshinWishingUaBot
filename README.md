@@ -2,6 +2,8 @@
 
 A Telegram chat bot that simulates Genshin Impact wishes. Built with C#, .NET 5.0 and SQLite as RDBMS.
 
+Current version 4.3 (ua)|2.8 (en/ru)
+
 ## Usage
 
 Add this bot to your group chat and start using it right away.
