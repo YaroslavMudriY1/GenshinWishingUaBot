@@ -122,7 +122,7 @@ namespace TelegramUI.Commands
                 result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-summer.webp";
             }
             
-            if (wish.Id is "keqing" or "ningguang")
+            if (wish.Id is "keqing" or "ningguang" or "shenhe" or "ganyu"or "xingqiu")
             {
                 result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-lanternrite.webp";
             }
