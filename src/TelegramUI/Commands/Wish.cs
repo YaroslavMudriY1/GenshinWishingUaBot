@@ -11,6 +11,7 @@ using Telegram.Bot.Types;
 using TelegramUI.Strings.Items;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
+using static System.Net.WebRequestMethods;
 
 namespace TelegramUI.Commands
 {
@@ -111,27 +112,57 @@ namespace TelegramUI.Commands
             sReader.Close();
             var textsList = JsonSerializer.Deserialize<List<string>>(textsText);
             
-            
-            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Stars, wish.Type,wish.TypeDesc);
+            //Outpur result as message
+            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Stars, wish.Type, wish.TypeDesc);
 
-            result[1] =
-                $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}.webp";
-            
-            if (wish.Id is "barbara" or "jean")
+            //Choosing skin|asset 
+            Random wishSkin = new Random();
+
+            string baseUrl= "https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/";
+           
+            result[1] = $"{baseUrl}{wish.Id}.webp";
+
+            if (wish.Id is "jean" or "mona" or "amber" or "rosaria")
             {
-                result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-summer.webp";
+                if (wishSkin.Next(2) == 0) // 50% chance of alternate skin
+                {
+                    result[1] = $"{baseUrl}{wish.Id}-alternate.webp";
+                }
+            }
+
+            if (wish.Id is "barbara" or "jean" or "klee" or "kaeya" or "fischl" or "kirara" or "nilou")
+            {
+                if (wishSkin.Next(3) == 0) // 33% chance for alternate skin|asset
+                {
+                    result[1] = $"{baseUrl}{wish.Id}-summer.webp"; //summer events skins
+                }
             }
             
-            if (wish.Id is "keqing" or "ningguang" or "shenhe" or "ganyu"or "xingqiu")
+            if (wish.Id is "keqing" or "ningguang" or "shenhe" or "ganyu" or "xingqiu" or "hutao" or "xiangling")
             {
-                result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-lanternrite.webp";
+                if (wishSkin.Next(3) == 0) //33% chance
+                {
+                    result[1] = $"{baseUrl}{wish.Id}-lanternrite.webp"; //lanter rite 2.4, 4.4 and 5.3 skins
+                }
             }
-             if (wish.Id is "diluc"or "ayaka" or "lisa" or "klee" or "kaeya"or "fischl")
+
+             if (wish.Id is "ayaka" or "lisa")
             {
-                result[1] = $"https://raw.githubusercontent.com/YaroslavMudriY1/GenshinWishingUaBot/main/assets/images/{wish.Id}-skin.webp";
+                if (wishSkin.Next(3) == 0) //33% chance
+                {
+                    result[1] = $"{baseUrl}{wish.Id}-skin.webp"; //other skins
+                }
             }
-               
-            
+
+            if (wish.Id is "diluc")
+            {
+                if (wishSkin.Next(5) == 0) //20% chance
+                {
+                    result[1] = $"{baseUrl}{wish.Id}-skin.webp"; //5* skins
+                }
+            }
+
+
             return result;
         }
         

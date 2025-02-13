@@ -9,6 +9,7 @@ namespace TelegramUI
 {
     public static class Program
     {
+        //[Obsolete]
         private static void Main()
         {
             TaskScheduler.Instance.ScheduleTask(0,2);
