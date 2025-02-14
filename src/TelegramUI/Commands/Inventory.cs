@@ -140,32 +140,48 @@ namespace TelegramUI.Commands
                 resultArray[2] = resultArray[2].Substring(0, resultArray[2].Length - 2) + "\n\n";
             }
             // Check if the user hit pity counter
-using var dbCon = new SQLiteConnection(MainDb());
-dbCon.Open();
+            using var dbCon = new SQLiteConnection(MainDb());
+            dbCon.Open();
 
-using var dbCmd = new SQLiteCommand(dbCon);
-dbCmd.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
-dbCmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
+            using var dbCmd = new SQLiteCommand(dbCon);
+            dbCmd.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
+            dbCmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
 
-dbCmd.CommandText = "SELECT FourPity, FivePity From UsersInChats WHERE UserId = @user AND ChatId = @chat";
-using var dbRdr = dbCmd.ExecuteReader();
+            dbCmd.CommandText = "SELECT FourPity, FivePity From UsersInChats WHERE UserId = @user AND ChatId = @chat";
+            using var dbRdr = dbCmd.ExecuteReader();
 
-// Зберігаємо значення Pity в локальні змінні
-int lastFiveStarPity = 0;
-int lastFourStarPity = 0;
+            // Зберігаємо значення Pity в локальні змінні
+            int lastFiveStarPity = 0;
+            int lastFourStarPity = 0;
 
-while (dbRdr.Read())
-{
-    lastFiveStarPity = dbRdr.GetInt32(1);
-    lastFourStarPity = dbRdr.GetInt32(0);
-}
+            while (dbRdr.Read())
+            {
+                lastFiveStarPity = dbRdr.GetInt32(1);
+                lastFourStarPity = dbRdr.GetInt32(0);
+            }
 
-// Закриваємо з'єднання з базою даних
-dbCon.Close();
+            // Отримуємо баланс Starglitter
+            int starglitter = 0;
+            using var cmd3 = new SQLiteCommand(con);
+            cmd3.Parameters.Add(new SQLiteParameter("@userId", message.From.Id));
+            cmd3.Parameters.Add(new SQLiteParameter("@chatId", message.Chat.Id));
+
+            cmd3.CommandText = "SELECT Starglitter FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
+            using var rdr3 = cmd3.ExecuteReader();
+            if (rdr3.Read())
+            {
+                starglitter = rdr3.GetInt32(0);
+            }
+
+            // Закриваємо з'єднання з базою даних
+            dbCon.Close();
 
             // Виводимо значення Pity
-resultArray[2] += $"Last 5* Pity: {lastFiveStarPity}\n";
-resultArray[2] += $"Last 4* Pity: {lastFourStarPity}\n";
+            resultArray[2] += $"Last 5* Pity: {lastFiveStarPity}\n";
+            resultArray[2] += $"Last 4* Pity: {lastFourStarPity}\n";
+
+            // Додаємо баланс Starglitter до виведення
+            resultArray[2] += $"\nStarglitter: {starglitter} ✨\n";
 
             var results = resultArray[0] + resultArray[1] + resultArray[2];
             

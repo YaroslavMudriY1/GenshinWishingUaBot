@@ -22,11 +22,14 @@ namespace TelegramUI.Commands
             var rnd = new Random(Guid.NewGuid().GetHashCode()).Next(1, 1000);
             return rnd switch
             {
-                < 12 => 5,
-                < 141 => 4,
-                _ => 3
+                < 17 => 5,  //5* characters or weapon (1.725%)
+                < 145 => 4, //4* characters or weapon (14.5%)
+                _ => 3      //3* weapon
             };
         }
+
+        private const int FourStarPityThreshold = 6;
+        private const int FiveStarPityThreshold = 30;
 
         internal static string[] GetCharacterPull(Message message)
         {
@@ -40,16 +43,17 @@ namespace TelegramUI.Commands
             cmd.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
             cmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
             
+
             // Check if the user hit pity counter
             cmd.CommandText = "SELECT FourPity, FivePity From UsersInChats WHERE UserId = @user AND ChatId = @chat";
             using var rdr = cmd.ExecuteReader();
             while (rdr.Read())
             {
-                if (rdr.GetInt32(0) >= 6)
+                if (rdr.GetInt32(0) >= FourStarPityThreshold)
                 {
                     rate = 4;
                 }
-                if (rdr.GetInt32(1) >= 29)
+                if (rdr.GetInt32(1) >= FiveStarPityThreshold)
                 {
                     rate = 5;
                 }
@@ -104,6 +108,55 @@ namespace TelegramUI.Commands
                     break;
             }
 
+            // Отримуємо поточну кількість предметів
+            cmd3.CommandText = "SELECT Count FROM InventoryItems WHERE UserId = @user AND ChatId = @chat AND ItemId = @wish";
+            using var rdr2 = cmd3.ExecuteReader();
+            int itemCount = 0;
+            if (rdr2.Read())
+            {
+                itemCount = rdr2.GetInt32(0);
+            }
+
+            rdr2.Close();
+
+            // Нарахування Starglitter
+            int starglitterReward = 0;
+            if (itemCount == 1) // Перша копія предмета
+            {
+                starglitterReward = wish.Stars switch
+                {
+                    5 => 10, // 10 Starglitter за перший 5*
+                    4 => 3,  // 3 Starglitter за перший 4*
+                    _ => 0
+                };
+            }
+            else if (itemCount >= 2 && itemCount <= 6) // Дублікати від 2 до 6
+            {
+                starglitterReward = wish.Stars switch
+                {
+                    5 => 10, // 10 Starglitter за 5*
+                    4 => 2, // 2 Starglitter за 4*
+                    _ => 0
+                };
+            }
+            else if (itemCount > 6) // Дублікати більше 6
+            {
+                starglitterReward = wish.Stars switch
+                {
+                    5 => 25, // 25 Starglitter за 5*
+                    4 => 5,  // 5 Starglitter за 4*
+                    _ => 0
+                };
+            }
+
+            if (starglitterReward > 0)
+            {
+                cmd3.CommandText = "UPDATE UsersInChats SET Starglitter = Starglitter + @starglitter WHERE UserId = @user AND ChatId = @chat";
+                cmd3.Parameters.Add(new SQLiteParameter("@starglitter", starglitterReward));
+                cmd3.ExecuteNonQuery();
+            }
+
+
             con.Close();
             
             var texts = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.General.{GetLanguage(message)}.json");
@@ -112,8 +165,8 @@ namespace TelegramUI.Commands
             sReader.Close();
             var textsList = JsonSerializer.Deserialize<List<string>>(textsText);
             
-            //Outpur result as message
-            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Stars, wish.Type, wish.TypeDesc);
+            //Output result as message
+            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Title, wish.Stars, wish.Type, wish.TypeDesc, wish.Region);
 
             //Choosing skin|asset 
             Random wishSkin = new Random();
@@ -166,6 +219,7 @@ namespace TelegramUI.Commands
             return result;
         }
         
+        //Check if user already rolled today
         internal static int HasRolled(Message message)
         {
             var result = 0; //fallback value
@@ -188,5 +242,45 @@ namespace TelegramUI.Commands
             
             return result;
         }
+
+        //Check user Starglitter balance
+        internal static int GetStarglitter(long userId)
+        {
+            int balance = 0;
+
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.Add(new SQLiteParameter("@user", userId));
+            cmd.CommandText = "SELECT Starglitter FROM UsersInChats WHERE UserId = @user";
+
+            using var rdr = cmd.ExecuteReader();
+            if (rdr.Read())
+            {
+                balance = rdr.GetInt32(0);
+            }
+
+            con.Close();
+
+            return balance;
+        }
+
+        //If user have 10+ Starglitter, use it for wish
+        internal static void UseStarglitter(long userId, int amount)
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.Add(new SQLiteParameter("@user", userId));
+            cmd.Parameters.Add(new SQLiteParameter("@amount", amount));
+
+            cmd.CommandText = "UPDATE UsersInChats SET Starglitter = Starglitter - @amount WHERE UserId = @user AND Starglitter >= @amount";
+            cmd.ExecuteNonQuery();
+
+            con.Close();
+        }
+
     }
 }

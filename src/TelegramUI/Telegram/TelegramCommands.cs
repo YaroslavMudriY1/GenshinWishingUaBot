@@ -56,7 +56,7 @@ namespace TelegramUI.Telegram
                         case "/help":
                             await Bot.SendTextMessageAsync(
                                 e.Message.Chat,
-                                "This bot is a Genshin Impact Wish Simulator that works only in the group chats. Feel free to add it to your chat (privacy mode is on so no spying on whatever conversations you may have).\n\nUse <code>/wish</code> command to make a wish. You can wish every 2 hours per chat. The timer resets at the beginning of each hour..\nUse <code>/inv</code> command to see your inventory. Inventories are bound to the chats.\nUse <code>/lang [locale]</code> to change the language in a chat. Only chat admins can do so (make sure you're not anonymous!). Available locales: en, ru.",
+                                "This bot is a Genshin Impact Wish Simulator that works only in the group chats. Feel free to add it to your chat (privacy mode is on so no spying on whatever conversations you may have).\n\nUse <code>/wish</code> command to make a wish. You can wish every 2 hours per chat. The timer resets at the beginning of each hour..\nUse <code>/inv</code> command to see your inventory. Inventories are bound to the chats.\nUse <code>/lang [locale]</code> to change the language in a chat. Only chat admins can do so (make sure you're not anonymous!). Available locales: en, ua.",
                                 ParseMode.Html);
                             break;
                         default:
@@ -134,46 +134,55 @@ catch (Exception exception)
                         }
                         break;
                     case "/wish":
-                        if (Wish.HasRolled(e.Message) == 1)
+                        var userId = e.Message.From.Id;
+                        var chatId = e.Message.Chat.Id;
+
+                        if (Wish.HasRolled(e.Message) == 1) // Перевіряємо, чи є таймер
                         {
-                            // These fixed parameters depend on Main's ScheduleTask parameters, edit accordingly
-                            var minuteDiff = 60 - DateTime.Now.Minute;
-                            var hourDiff = 21 - DateTime.Now.Hour - 1;
-                            if (minuteDiff == 60)
+                            if (Wish.GetStarglitter(userId) >= 10) // Якщо у користувача є 10+ Starglitter
                             {
-                                hourDiff += 1;
-                                minuteDiff = 0;
+                                Wish.UseStarglitter(userId, 10); // Знімаємо 10 Starglitter
                             }
-
-                            if (hourDiff < 0)
+                            else
                             {
-                                hourDiff += 24;
-                            }
-
-                            if (minuteDiff == 0 && hourDiff == 0)
-                            {
-                                hourDiff = 24;
-                            }
-
-                            while (true)
-                            {
-                                try
+                                // These fixed parameters depend on Main's ScheduleTask parameters, edit accordingly
+                                var minuteDiff = 60 - DateTime.Now.Minute;
+                                var hourDiff = 21 - DateTime.Now.Hour - 1;
+                                if (minuteDiff == 60)
                                 {
-                                    await Bot.SendTextMessageAsync(
-                                        e.Message.Chat.Id,
-                                        string.Format(textsList[1], hourDiff, minuteDiff),
-                                        replyToMessageId: e.Message.MessageId);
-                                    break;
+                                    hourDiff += 1;
+                                    minuteDiff = 0;
                                 }
-                                catch (Exception exception)
+
+                                if (hourDiff < 0)
                                 {
-                                    // ignored
+                                    hourDiff += 24;
                                 }
+
+                                if (minuteDiff == 0 && hourDiff == 0)
+                                {
+                                    hourDiff = 24;
+                                }
+
+                                while (true)
+                                {
+                                    try
+                                    {
+                                        await Bot.SendTextMessageAsync(
+                                            e.Message.Chat.Id,
+                                            string.Format(textsList[1], hourDiff, minuteDiff),
+                                            replyToMessageId: e.Message.MessageId);
+                                        break;
+                                    }
+                                    catch (Exception exception)
+                                    {
+                                        // ignored
+                                    }
+                                }
+
+                                return;
                             }
-                            
-                            return;
                         }
-                        
                         var pull = Wish.GetCharacterPull(e.Message);
 
                         while (true)

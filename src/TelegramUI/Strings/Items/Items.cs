@@ -26,5 +26,11 @@ namespace TelegramUI.Strings.Items
         
         [JsonPropertyName("typeDesc")]
         public string TypeDesc { get; set; }
+
+        [JsonPropertyName("title")]
+        public string Title { get; set; }
+
+        [JsonPropertyName("region")]
+        public string Region { get; set; }
     }
 }
