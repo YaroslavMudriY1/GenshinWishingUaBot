@@ -31,11 +31,9 @@
 
     <ItemGroup>
       <EmbeddedResource Include="Strings\General\ua.json" />
-      <EmbeddedResource Include="Strings\Items\ru.json" />
       <None Remove="Strings\General\ua.json" />
       <None Remove="Strings\Items\en.json" />
       <None Remove="Strings\Items\ua.json" />
-      <EmbeddedResource Include="Strings\General\ru.json" />
       <EmbeddedResource Include="Strings\Items\en.json" />
       <None Remove="Strings\General\en.json" />
       <EmbeddedResource Include="Strings\General\en.json" />

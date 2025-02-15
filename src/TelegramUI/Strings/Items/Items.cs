@@ -32,5 +32,8 @@ namespace TelegramUI.Strings.Items
 
         [JsonPropertyName("region")]
         public string Region { get; set; }
+
+        [JsonPropertyName("isEvent")]
+        public bool IsEvent { get; set; }
     }
 }

@@ -12,41 +12,76 @@ using TelegramUI.Strings.Items;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
 using static System.Net.WebRequestMethods;
+using System.Globalization;
 
 namespace TelegramUI.Commands
 {
     public static class Wish
     {
-        private static int Randomizer()
+        //Type randomizer (character or weapon)
+        private static int RandomizerType()
+        {
+            return new Random(Guid.NewGuid().GetHashCode()).Next(0, 2); // 0 - Character, 1 - Weapon
+        }
+
+        //Chars rarity (stars) randomizer
+        private static int RandomizerCharChance()
         {
             var rnd = new Random(Guid.NewGuid().GetHashCode()).Next(1, 1000);
             return rnd switch
             {
-                < 17 => 5,  //5* characters or weapon (1.725%)
-                < 145 => 4, //4* characters or weapon (14.5%)
-                _ => 3      //3* weapon
+                < 16 => 5,  // 5* characters (1.6%)
+                < 130 => 4, // 4* characters (13%)
+                _ => 3     // 3* weapon (85.4%)
             };
         }
 
-        private const int FourStarPityThreshold = 6;
-        private const int FiveStarPityThreshold = 30;
+        //Weapon rarity (stars) randomizer
+        private static int RandomizerWeaponChance()
+        {
+            var rnd = new Random(Guid.NewGuid().GetHashCode()).Next(1, 1000);
+            return rnd switch
+            {
+                < 18 => 5,  // 5* weappon (1.8%)
+                < 145 => 4,  // 4* weapon (14.5%)
+                _ => 3      // 3* weapon (83.7%)
+            };
+        }
+
+        // 50|50 randomizer for event 5*
+        private static bool FiftyFiftyRandomizer()
+        {
+            return new Random(Guid.NewGuid().GetHashCode()).Next(0, 2) == 0; // 50% шанс виграшу
+        }
+
+        private const int FourStarPityThreshold = 6; // One four star every 7 wishes | 7th wish is guaranteed 4* or higher
+        private const int FiveStarPityThreshold = 30; // One five star every 31 wishes | 31th wish is guaranteed 5*
 
         internal static string[] GetCharacterPull(Message message)
         {
             var result = new string[2];
-            var rate = Randomizer();
-            
+            var type = RandomizerType(); // Select type (character or weapon)
+            int rate = type == 0 ? RandomizerCharChance() : RandomizerWeaponChance(); // Select radomizer type
+
+            //If randomizers give 3* chars, convert to 3* weapon (no 3* chars in list)
+            if (type == 0 && rate == 3)
+            {
+                type = 1;
+            }
+
             using var con = new SQLiteConnection(MainDb());
             con.Open();
             
             using var cmd = new SQLiteCommand(con);
             cmd.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
             cmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
-            
+
 
             // Check if the user hit pity counter
-            cmd.CommandText = "SELECT FourPity, FivePity From UsersInChats WHERE UserId = @user AND ChatId = @chat";
+            cmd.CommandText = "SELECT FourPity, FivePity, FiftyLose FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
             using var rdr = cmd.ExecuteReader();
+            bool FiftyLose = false;
+
             while (rdr.Read())
             {
                 if (rdr.GetInt32(0) >= FourStarPityThreshold)
@@ -57,16 +92,34 @@ namespace TelegramUI.Commands
                 {
                     rate = 5;
                 }
+                FiftyLose = rdr.GetBoolean(2);
             }
-            
+
+            //Loading list of items
             var items = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.Items.{GetLanguage(message)}.json");
             var sR = new StreamReader(items);
             var itemsText = sR.ReadToEnd();
             sR.Close();
             
             var itemsList = JsonSerializer.Deserialize<List<Items>>(itemsText);
-            
-            var filteredList = itemsList.Where(x => x.Stars == rate).ToList();
+
+            bool isEvent = rate == 5 && (!FiftyLose && FiftyFiftyRandomizer() || FiftyLose);
+
+            //List filtration by type and rarity (stars)
+            var filteredList = itemsList.Where(x => x.Stars == rate && x.TypeId == (type == 0 ? "character" : "weapon")).ToList();
+
+            if (rate == 5)
+            {
+                if (isEvent)
+                {
+                    filteredList = filteredList.Where(x => x.IsEvent == true).ToList(); // Only event 5★
+                }
+                else
+                {
+                    filteredList = filteredList.Where(x => x.IsEvent == false).ToList(); // Only standart 5★
+                }
+            }
+
             var rnd = new Random(Guid.NewGuid().GetHashCode()).Next(filteredList.Count);
             var wish = filteredList[rnd];
 
@@ -74,19 +127,28 @@ namespace TelegramUI.Commands
             cmd3.Parameters.Add(new SQLiteParameter("@wish", wish.Id));
             cmd3.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
             cmd3.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
+            cmd3.Parameters.Add(new SQLiteParameter("@type", wish.TypeId));
+            cmd3.Parameters.Add(new SQLiteParameter("@isStandard", !isEvent));
             
+            //Update 50|50 state
+            if (rate == 5)
+            {
+                cmd3.CommandText = "UPDATE UsersInChats SET FiftyLose = @isStandard WHERE UserId = @user AND ChatId = @chat";
+                cmd3.ExecuteNonQuery();
+            }
+
             // Adding user to a DB if it doesn't exist
             cmd3.CommandText = "INSERT OR IGNORE INTO UsersInChats(UserId, ChatId) VALUES(@user, @chat)";
             cmd3.ExecuteNonQuery();
-            
-            // Update that user has rolled in the chat today
-            cmd3.CommandText = "UPDATE UsersInChats SET HasRolled = 1 WHERE UserId = @user AND ChatId = @chat";
-            cmd3.ExecuteNonQuery();
-            
+
+            /*            // Update that user has rolled in the chat today
+                        cmd3.CommandText = "UPDATE UsersInChats SET HasRolled = 1 WHERE UserId = @user AND ChatId = @chat";
+                        cmd3.ExecuteNonQuery();*/
+
             // Adding the item to the user's inventory
-            cmd3.CommandText = "INSERT OR IGNORE INTO InventoryItems(UserId, ChatId, ItemId) VALUES(@user, @chat, @wish)";
+            cmd3.CommandText = "INSERT OR IGNORE INTO InventoryItems(UserId, ChatId, ItemId, Type) VALUES(@user, @chat, @wish, @type)";
             cmd3.ExecuteNonQuery();
-            
+
             // Updating item count in user's inventory
             cmd3.CommandText = "UPDATE InventoryItems SET Count = Count + 1 WHERE UserId = @user AND ChatId = @chat AND ItemId = @wish";
             cmd3.ExecuteNonQuery();
@@ -108,39 +170,48 @@ namespace TelegramUI.Commands
                     break;
             }
 
-            // Отримуємо поточну кількість предметів
-            cmd3.CommandText = "SELECT Count FROM InventoryItems WHERE UserId = @user AND ChatId = @chat AND ItemId = @wish";
+            //Total Wishes +1
+            cmd3.CommandText = "UPDATE UsersInChats SET TotalWishes = TotalWishes + 1 WHERE UserId = @user AND ChatId = @chat";
+
+            // Get current items count
+            cmd3.CommandText = "SELECT Count, Type FROM InventoryItems WHERE UserId = @user AND ChatId = @chat AND ItemId = @wish";
             using var rdr2 = cmd3.ExecuteReader();
             int itemCount = 0;
+            string itemType = "weapon";
             if (rdr2.Read())
             {
                 itemCount = rdr2.GetInt32(0);
+                itemType = rdr2.GetString(1);
             }
-
             rdr2.Close();
 
-            // Нарахування Starglitter
+            // Starglitter
             int starglitterReward = 0;
-            if (itemCount == 1) // Перша копія предмета
+            if (itemCount == 1) // Fisrt copy of item
             {
                 starglitterReward = wish.Stars switch
                 {
-                    5 => 10, // 10 Starglitter за перший 5*
-                    4 => 3,  // 3 Starglitter за перший 4*
+                    5 => 10, // 10 Starglitter for first 5*
+                    4 => 3,  // 3 Starglitter for firtst 4*
                     _ => 0
                 };
             }
-            else if (itemCount >= 2 && itemCount <= 6) // Дублікати від 2 до 6
+            else if (itemCount >= 2 && ((itemType == "weapon" && itemCount <= 5) || (itemType == "character" && itemCount <= 7)))
             {
+                //For weapon 2<x<5 count
+                //For characters 2<x<7 count
+
                 starglitterReward = wish.Stars switch
                 {
-                    5 => 10, // 10 Starglitter за 5*
-                    4 => 2, // 2 Starglitter за 4*
+                    5 => 10, // 10 Starglitter for 5*
+                    4 => 2, // 2 Starglitter for 4*
                     _ => 0
                 };
             }
-            else if (itemCount > 6) // Дублікати більше 6
+            else if ((itemType == "weapon" && itemCount > 5) || (itemType == "character" && itemCount > 7))
             {
+                //For weapon - if more than R5 count
+                //For characters - if more than C6 count
                 starglitterReward = wish.Stars switch
                 {
                     5 => 25, // 25 Starglitter за 5*
@@ -166,7 +237,7 @@ namespace TelegramUI.Commands
             var textsList = JsonSerializer.Deserialize<List<string>>(textsText);
             
             //Output result as message
-            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Title, wish.Stars, wish.Type, wish.TypeDesc, wish.Region);
+            result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Title, wish.Stars, wish.Type, wish.TypeDesc, wish.Region, starglitterReward);
 
             //Choosing skin|asset 
             Random wishSkin = new Random();
@@ -222,25 +293,43 @@ namespace TelegramUI.Commands
         //Check if user already rolled today
         internal static int HasRolled(Message message)
         {
-            var result = 0; //fallback value
-            
             using var con = new SQLiteConnection(MainDb());
             con.Open();
-            
             using var cmd = new SQLiteCommand(con);
-            cmd.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
-            cmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
-            
-            cmd.CommandText = "SELECT HasRolled FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
-            using var rdr = cmd.ExecuteReader();
-            while (rdr.Read())
+            cmd.Parameters.AddWithValue("@user", message.From.Id);
+            cmd.Parameters.AddWithValue("@chat", message.Chat.Id);
+
+            // Get last wish time
+            cmd.CommandText = "SELECT LastWishTime FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
+            var lastWishTime = cmd.ExecuteScalar();
+
+            if (lastWishTime == DBNull.Value || lastWishTime == null)
             {
-                result = rdr.GetInt32(0);
+                return 0; // User didn't do wish
             }
-            
-            con.Close();
-            
-            return result;
+
+            // Try parsing the date with the exact format
+            var lastWish = DateTime.ParseExact(lastWishTime.ToString(), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+            var nextWishAvailable = lastWish.AddHours(2); // Timer for two hours
+
+            return DateTime.Now < nextWishAvailable ? 1 : 0;
+        }
+
+        //Set wish time in database
+        internal static void SetWishTime(long userId, long chatId)
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.AddWithValue("@user", userId);
+            cmd.Parameters.AddWithValue("@chat", chatId);
+
+            // Save current time in "yyyy-MM-dd HH:mm:ss" format
+            var currentTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+            cmd.Parameters.AddWithValue("@time", currentTime);
+            cmd.CommandText = "UPDATE UsersInChats SET LastWishTime = @time WHERE UserId = @user AND ChatId = @chat";
+            cmd.ExecuteNonQuery();
         }
 
         //Check user Starglitter balance

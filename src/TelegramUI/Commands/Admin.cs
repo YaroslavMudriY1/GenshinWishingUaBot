@@ -17,7 +17,7 @@ namespace TelegramUI.Commands
             cmd.Parameters.Add(new SQLiteParameter("@user", message.ReplyToMessage.From.Id));
             cmd.Parameters.Add(new SQLiteParameter("@chat", message.ReplyToMessage.Chat.Id));
             
-            cmd.CommandText = "UPDATE UsersInChats SET HasRolled = 0 WHERE UserId = @user AND ChatId = @chat";
+            cmd.CommandText = "UPDATE UsersInChats SET LastWishTime = NULL WHERE UserId = @user AND ChatId = @chat";
             cmd.ExecuteNonQuery();
             
             con.Close();
@@ -31,7 +31,7 @@ namespace TelegramUI.Commands
             using var cmd = new SQLiteCommand(con);
             cmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
             
-            cmd.CommandText = "UPDATE UsersInChats SET HasRolled = 0 WHERE ChatId = @chat";
+            cmd.CommandText = "UPDATE UsersInChats SET LastWishTime = NULL WHERE ChatId = @chat";
             cmd.ExecuteNonQuery();
             
             con.Close();

@@ -12,6 +12,7 @@ using Telegram.Bot.Types.Enums;
 using TelegramUI.Commands;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
+using System.Data.SQLite;
 
 namespace TelegramUI.Telegram
 {
@@ -74,41 +75,41 @@ namespace TelegramUI.Telegram
                 if (e.Message.Chat.Type != ChatType.Group && e.Message.Chat.Type != ChatType.Supergroup) return;
 
                 AddChat(e.Message);
-// Declare textsList outside of the try block to make it accessible later
-List<string> textsList = null;
+                // Declare textsList outside of the try block to make it accessible later
+                List<string> textsList = null;
 
-try
-{
-    string messageText = e.Message.Text;
-   
-    var resourceName = $"TelegramUI.Strings.General.{GetLanguage(e.Message)}.json";
-    var assembly = typeof(Wish).Assembly;
-    var resourceStream = assembly.GetManifestResourceStream(resourceName);
+                try
+                {
+                    string messageText = e.Message.Text;
 
-    if (resourceStream != null)
-    {
-        using var sReader = new StreamReader(resourceStream);
-        var textsText = sReader.ReadToEnd();
-        textsList = JsonSerializer.Deserialize<List<string>>(textsText);
+                    var resourceName = $"TelegramUI.Strings.General.{GetLanguage(e.Message)}.json";
+                    var assembly = typeof(Wish).Assembly;
+                    var resourceStream = assembly.GetManifestResourceStream(resourceName);
 
-        // Now you can use textsList for further processing
-    }
-    else
-    {
-        Console.WriteLine($"Failed to retrieve the resource: {resourceName}");
-        return;  // Exit early as we can't proceed without the resource
-    }
+                    if (resourceStream != null)
+                    {
+                        using var sReader = new StreamReader(resourceStream);
+                        var textsText = sReader.ReadToEnd();
+                        textsList = JsonSerializer.Deserialize<List<string>>(textsText);
 
-    // Rest of your code using textsList
-    if (e.Message.Chat.Type != ChatType.Group && e.Message.Chat.Type != ChatType.Supergroup)
-        return;
+                        // Now you can use textsList for further processing
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Failed to retrieve the resource: {resourceName}");
+                        return;  // Exit early as we can't proceed without the resource
+                    }
 
-  
-}
-catch (Exception exception)
-{
-    // Handle exceptions here
-}
+                    // Rest of your code using textsList
+                    if (e.Message.Chat.Type != ChatType.Group && e.Message.Chat.Type != ChatType.Supergroup)
+                        return;
+
+
+                }
+                catch (Exception exception)
+                {
+                    // Handle exceptions here
+                }
 
 
                 switch (msg)
@@ -133,36 +134,53 @@ catch (Exception exception)
                             }
                         }
                         break;
+
                     case "/wish":
                         var userId = e.Message.From.Id;
                         var chatId = e.Message.Chat.Id;
 
-                        if (Wish.HasRolled(e.Message) == 1) // Перевіряємо, чи є таймер
+                        if (Wish.HasRolled(e.Message) == 1) // Check if user already rolled
                         {
-                            if (Wish.GetStarglitter(userId) >= 10) // Якщо у користувача є 10+ Starglitter
+                            if (Wish.GetStarglitter(userId) >= 10) // If user have 10 or more Starglitters
                             {
-                                Wish.UseStarglitter(userId, 10); // Знімаємо 10 Starglitter
+                                Wish.UseStarglitter(userId, 10); // Use it for extra wish (ignores timer)
+
+                                int newBalance = Wish.GetStarglitter(userId); // Check balance after use
+
+                                    try
+                                    {
+                                        await Bot.SendTextMessageAsync(
+                                            e.Message.Chat.Id,
+                                            string.Format(textsList[4], newBalance),
+                                            replyToMessageId: e.Message.MessageId);
+
+                                    }
+                                    catch (Exception exception)
+                                    {
+                                    // ignored
+                                    //Console.WriteLine("Помилка при відправці повідомлення Starglitter: " + exception.ToString());
+                                }
+
                             }
                             else
                             {
-                                // These fixed parameters depend on Main's ScheduleTask parameters, edit accordingly
-                                var minuteDiff = 60 - DateTime.Now.Minute;
-                                var hourDiff = 21 - DateTime.Now.Hour - 1;
-                                if (minuteDiff == 60)
-                                {
-                                    hourDiff += 1;
-                                    minuteDiff = 0;
-                                }
+                                using var con = new SQLiteConnection(MainDb());
+                                con.Open();
+                                using var cmd = new SQLiteCommand(con);
+                                cmd.Parameters.AddWithValue("@user", userId);
+                                cmd.Parameters.AddWithValue("@chat", chatId);
+                                cmd.CommandText = "SELECT LastWishTime FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
+                                var lastWishTime = cmd.ExecuteScalar();
 
-                                if (hourDiff < 0)
-                                {
-                                    hourDiff += 24;
-                                }
+                                DateTime lastWish = DateTime.Parse(lastWishTime.ToString());
+                                DateTime nextWish = lastWish.AddHours(2); //add two hour wish interval
+                                TimeSpan remaining = nextWish - DateTime.Now;
 
-                                if (minuteDiff == 0 && hourDiff == 0)
-                                {
-                                    hourDiff = 24;
-                                }
+                                int hourDiff = remaining.Hours;
+                                int minuteDiff = remaining.Minutes;
+
+                                if (hourDiff < 0) hourDiff = 0;
+                                if (minuteDiff < 0) minuteDiff = 0;
 
                                 while (true)
                                 {
@@ -183,6 +201,10 @@ catch (Exception exception)
                                 return;
                             }
                         }
+
+                        //If wish availiable, update wish time
+                        Wish.SetWishTime(userId, chatId);
+
                         var pull = Wish.GetCharacterPull(e.Message);
 
                         while (true)
@@ -203,6 +225,7 @@ catch (Exception exception)
                             }
                         }
                         break;
+
                     case "/resetUser":
                         if (e.Message.From.Id.ToString() != AdminId()) return;
                         Admin.ResetUser(e.Message);
@@ -229,12 +252,6 @@ catch (Exception exception)
                                 {
                                     switch (msg)
                                     {
-                                        case "/lang ru":
-                                            ChangeLanguage(e.Message, "ru");
-                                            await Bot.SendTextMessageAsync(
-                                                e.Message.Chat,
-                                                "Язык изменён на русский.");
-                                            break;
                                         case "/lang en":
                                             ChangeLanguage(e.Message, "en");
                                             await Bot.SendTextMessageAsync(

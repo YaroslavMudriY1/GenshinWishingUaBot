@@ -16,15 +16,15 @@ namespace TelegramUI.Commands
 {
     public static class Inventory
     {
-       // private static int lastFiveStarPity = 0;
-       // private static int lastFourStarPity = 0;
        
         internal static string InventoryFetch(Message message)
         {
             var result = new string[3];
-            var resultArray = new string[3];
+            var resultArray = new string[5];
             var itemStarCount = new int[3];
-            
+            var characterCount = new int[3];
+            var weaponCount = new int[3];
+
             // 5 Stars
             result[0] = "";
             itemStarCount[0] = 0;
@@ -45,19 +45,23 @@ namespace TelegramUI.Commands
             con.Open();
             
             using var cmd = new SQLiteCommand(con);
-            cmd.Parameters.Add(new SQLiteParameter("@userId", message.From.Id));
-            cmd.Parameters.Add(new SQLiteParameter("@chatId", message.Chat.Id));
-            
-            // Getting user's inventory IDs and count
-            cmd.CommandText = "SELECT ItemId, Count FROM InventoryItems WHERE UserId = @userId AND ChatId = @chatId";
-            using var rdr = cmd.ExecuteReader();
-            while (rdr.Read())
             {
-                itemIds.Add(rdr.GetString(0));
-                countIds.Add(rdr.GetInt32(1));
+                cmd.Parameters.Add(new SQLiteParameter("@userId", message.From.Id));
+                cmd.Parameters.Add(new SQLiteParameter("@chatId", message.Chat.Id));
+
+                // Getting user's inventory IDs and count
+                cmd.CommandText = "SELECT ItemId, Count FROM InventoryItems WHERE UserId = @userId AND ChatId = @chatId";
+                using var rdr = cmd.ExecuteReader();
+                {
+                    while (rdr.Read())
+                    {
+                        itemIds.Add(rdr.GetString(0));
+                        countIds.Add(rdr.GetInt32(1));
+                    }
+                }
             }
-            
-            using var cmd2 = new SQLiteCommand(con);
+
+            //using var cmd2 = new SQLiteCommand(con);
 
             // Linking item IDs to actual data
             for (var i = 0; i <= itemIds.Count - 1; i++)
@@ -75,42 +79,38 @@ namespace TelegramUI.Commands
                 switch (item.Stars)
                 {
                     case 5:
-                        switch (item.TypeId)
+                        if (item.TypeId == "character")
                         {
-                            case "character":
-                                resultCharacters[0] += $"{item.Name} x{countIds[i]}, ";
-                                itemStarCount[0]+=countIds[i];
-                                break;
-                            case "weapon":
-                                resultWeapons[0] += $"{item.Name} x{countIds[i]}, ";
-                                itemStarCount[0]+=countIds[i];
-                                break;
+                            resultCharacters[0] += $"{item.Name} x{countIds[i]}, ";
+                            itemStarCount[0] += countIds[i];
+                            characterCount[0] += countIds[i];
+                        }
+                        else if (item.TypeId == "weapon")
+                        {
+                            resultWeapons[0] += $"{item.Name} x{countIds[i]}, ";
+                            itemStarCount[0] += countIds[i];
+                            weaponCount[0] += countIds[i];
                         }
                         break;
                     case 4:
-                        switch (item.TypeId)
+                        if (item.TypeId == "character")
                         {
-                            case "character":
-                                resultCharacters[1] += $"{item.Name} x{countIds[i]}, ";
-                                itemStarCount[1] += countIds[i];
-                                break;
-                            case "weapon":
-                                resultWeapons[1] += $"{item.Name} x{countIds[i]}, ";
-                                itemStarCount[1] += countIds[i];
-                                break;
+                            resultCharacters[1] += $"{item.Name} x{countIds[i]}, ";
+                            itemStarCount[1] += countIds[i];
+                            characterCount[1] += countIds[i];
+                        }
+                        else if (item.TypeId == "weapon")
+                        {
+                            resultWeapons[1] += $"{item.Name} x{countIds[i]}, ";
+                            itemStarCount[1] += countIds[i];
+                            weaponCount[1] += countIds[i];
                         }
                         break;
                     case 3:
-                        switch (item.TypeId)
+                        if (item.TypeId == "weapon")
                         {
-                            case "character":
-                                resultCharacters[2] += $"{item.Name} x{countIds[i]}, ";
-                                itemStarCount[2] += countIds[i];
-                                break;
-                            case "weapon":
-                                resultWeapons[2] += $"{item.Name} x{countIds[i]}, ";
-                                itemStarCount[2] += countIds[i];
-                                break;
+                            resultWeapons[2] += $"{item.Name} x{countIds[i]}, ";
+                            itemStarCount[2] += countIds[i];
                         }
                         break;
                 }
@@ -122,69 +122,106 @@ namespace TelegramUI.Commands
             result[1] = resultCharacters[1] + resultWeapons[1];
             result[2] = resultCharacters[2] + resultWeapons[2];
 
-           if (result[0] != "")
+           if (result[0] != "") //5*
             {
                 resultArray[0] = $"\U00002b50\U00002b50\U00002b50\U00002b50\U00002b50 ({itemStarCount[0]})\n{result[0]}";
                 resultArray[0] = resultArray[0].Substring(0, resultArray[0].Length - 2) + "\n\n";
-                //resultArray[0] += $"Last 5* Pity: {lastFiveStarPity}\n";
             }
-            if (result[1] != "")
+            if (result[1] != "") //4*
             {
                 resultArray[1] = $"\U00002b50\U00002b50\U00002b50\U00002b50 ({itemStarCount[1]})\n{result[1]}";
                 resultArray[1] = resultArray[1].Substring(0, resultArray[1].Length - 2) + "\n\n";
-                //resultArray[1] += $"Last 4* Pity: {lastFourStarPity}\n";
             }
-            if (result[2] != "")
+            if (result[2] != "") //3*
             {
                 resultArray[2] = $"\U00002b50\U00002b50\U00002b50 ({itemStarCount[2]})\n{result[2]}";
                 resultArray[2] = resultArray[2].Substring(0, resultArray[2].Length - 2) + "\n\n";
             }
-            // Check if the user hit pity counter
-            using var dbCon = new SQLiteConnection(MainDb());
-            dbCon.Open();
 
-            using var dbCmd = new SQLiteCommand(dbCon);
-            dbCmd.Parameters.Add(new SQLiteParameter("@user", message.From.Id));
-            dbCmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
+            //Subtotal 
+            /*            resultArray[3] = $"Total:\n\n5★ Characters: {characterCount[0]}\n5★ Weapon: {weaponCount[0]}\n"
+                    + $"4★ Characters: {characterCount[1]}\n4★ Weapon: {weaponCount[1]}\n"
+                    + $"3★ Weapon: {weaponCount[2]}\n";*/
+            
+            int totalWishes = 0;
 
-            dbCmd.CommandText = "SELECT FourPity, FivePity From UsersInChats WHERE UserId = @user AND ChatId = @chat";
-            using var dbRdr = dbCmd.ExecuteReader();
+            using (var cmd2 = new SQLiteCommand(con))
+            {
+                cmd2.Parameters.AddWithValue("@userId", message.From.Id);
+                cmd2.Parameters.AddWithValue("@chatId", message.Chat.Id);
+                cmd2.CommandText = "SELECT TotalWishes FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
 
-            // Зберігаємо значення Pity в локальні змінні
+                using (var rdr = cmd2.ExecuteReader())
+                {
+                    if (rdr.Read())
+                    {
+                        totalWishes = rdr.GetInt32(0);
+                    }
+                }
+            }
+
+            var language = GetLanguage(message);
+            var generalStrings = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.General.{language}.json");
+            var sRGeneral = new StreamReader(generalStrings);
+            var generalText = sRGeneral.ReadToEnd();
+            sRGeneral.Close();
+            var generalList = JsonSerializer.Deserialize<List<string>>(generalText);
+            //Used strings for different languages
+            resultArray[3] = string.Format(generalList[5], characterCount[0], weaponCount[0], characterCount[1], weaponCount[1],totalWishes);
+
+            // Save Pity as variable
             int lastFiveStarPity = 0;
             int lastFourStarPity = 0;
 
-            while (dbRdr.Read())
+            //Check if User hit Pity variable
+            using (var cmd3 = new SQLiteCommand(con))
             {
-                lastFiveStarPity = dbRdr.GetInt32(1);
-                lastFourStarPity = dbRdr.GetInt32(0);
+                cmd3.Parameters.AddWithValue("@userId", message.From.Id);
+                cmd3.Parameters.AddWithValue("@chatId", message.Chat.Id);
+                cmd3.CommandText = "SELECT FourPity, FivePity FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
+
+                using (var rdr = cmd3.ExecuteReader())
+                {
+                    if (rdr.Read())
+                    {
+                        lastFourStarPity = rdr.GetInt32(0);
+                        lastFiveStarPity = rdr.GetInt32(1);
+                    }
+                }
             }
 
-            // Отримуємо баланс Starglitter
+            // Get Starglitter balance
             int starglitter = 0;
-            using var cmd3 = new SQLiteCommand(con);
-            cmd3.Parameters.Add(new SQLiteParameter("@userId", message.From.Id));
-            cmd3.Parameters.Add(new SQLiteParameter("@chatId", message.Chat.Id));
-
-            cmd3.CommandText = "SELECT Starglitter FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
-            using var rdr3 = cmd3.ExecuteReader();
-            if (rdr3.Read())
+            using (var cmd4 = new SQLiteCommand(con))
             {
-                starglitter = rdr3.GetInt32(0);
+                cmd4.Parameters.AddWithValue("@userId", message.From.Id);
+                cmd4.Parameters.AddWithValue("@chatId", message.Chat.Id);
+                cmd4.CommandText = "SELECT Starglitter FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
+
+                using (var rdr = cmd4.ExecuteReader())
+                {
+                    if (rdr.Read())
+                    {
+                        starglitter = rdr.GetInt32(0);
+                    }
+                }
             }
 
-            // Закриваємо з'єднання з базою даних
-            dbCon.Close();
+            con.Close();
 
-            // Виводимо значення Pity
-            resultArray[2] += $"Last 5* Pity: {lastFiveStarPity}\n";
-            resultArray[2] += $"Last 4* Pity: {lastFourStarPity}\n";
+            /*
+                        // Message output Pity
+                        resultArray[4] += $"Last 5⭐️ Pity: {lastFiveStarPity}\n";
+                        resultArray[4] += $"Last 4⭐️ Pity: {lastFourStarPity}\n";
 
-            // Додаємо баланс Starglitter до виведення
-            resultArray[2] += $"\nStarglitter: {starglitter} ✨\n";
+                        // Message output Starglitter
+                        resultArray[4] += $"\nStarglitter: {starglitter} ✨\n";*/
 
-            var results = resultArray[0] + resultArray[1] + resultArray[2];
-            
+            //Used strings
+            resultArray[4]= string.Format(generalList[6], lastFiveStarPity, lastFourStarPity, starglitter);
+
+            var results = resultArray[0] + resultArray[1] + resultArray[2] + resultArray[3] + resultArray[4];
+
             var texts = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.General.{GetLanguage(message)}.json");
             var sReader = new StreamReader(texts);
             var textsText = sReader.ReadToEnd();

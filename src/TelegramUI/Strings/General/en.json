@@ -1,6 +1,9 @@
 ﻿[
-  "{0}\n\n{1}, you have received {3}, - {2}!\n\n{2} is a {5}, {4}-star {6} from {7}.",
-  "You've already wished today! You can wish again in {0} hours and {1} minutes.",
+  "{0}\n\n{1}, you have received {3}, - {2}!\n\n{2} is a {5}, {4}⭐️ {6} from {7}.\n\nFor this wish you get {8}Starglitter✨!",
+  "Oh no! You've already wished!😥\nYou have not enough Starglitter✨ to do extra wish!🥺\nYou can wish again in {0}h:{1}m!🕑",
   "Here's your inventory in {0}, {1}!\n\n{2}",
-  "It's empty! There's nothing here!"
+  "It's empty! There's nothing here! But you can change that by typing /wish",
+  "You used 10 Starglitter✨ for extra wish!\nNow your balance: {0}✨",
+  "<i>Subtotal</i>: \n\n5★ Characters: {0}\n5★ Weapon: {1}\n4★ Characters: {2}\n4★ Weapon: {3}\n\n<b>All-time wishes:</b> {4}\n",
+  "Last 5⭐️ Pity: {0}\nLast 4⭐️ Pity{1}\nStarglitter: {2}✨"
 ]

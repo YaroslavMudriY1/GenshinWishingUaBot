@@ -12,7 +12,7 @@ namespace TelegramUI
         //[Obsolete]
         private static void Main()
         {
-            TaskScheduler.Instance.ScheduleTask(0,2);
+            TaskScheduler.Instance.ScheduleDailyReset();
 
             Bot.OnMessage += TelegramCommands.BotOnMessage;
 
