@@ -17,19 +17,19 @@ A Telegram chat bot that simulates Genshin Impact wishes. Built with C#, .NET 5.
 
 *'current Genshin Impact patch - 5.3. Last bot update - 15.02.2025
 
-###If you want to try bot, check `@WishGenshinUaBot` in telegram. (works only in groups)
+### If you want to try bot, check `@WishGenshinUaBot` in telegram. (works only in groups)
 
 ## Usage
 
 Add this bot to your group chat and start using it right away.
 
-###User commands:
+### User commands:
 - /wish - make a wish and get a randomized result, can wish once a two hour per chat, resets at 12PM UTC+0.
 - /wish10 - make a ten wish, using 100 starglitter ✨. 
 - /inv - get your inventory in the chat.
 - /balance - get your starglitter✨ balance.
 
-###Admins commands:
+### Admins commands:
 - /lang [code] (chat admins only) - change the locale for a specific chat, e.g. `/lang en`. Avaliable: `en, ua`.
 - /addStar [amount] (bot owner only) - reply to any user's message with this command to add some amount to user's starglitter balance.
 - /resetUser (bot owner only) - reply to any user's message with this command to reset his wish timer.
@@ -55,4 +55,4 @@ Genshin Impact content and materials are a copyright of miHoYo Co., Ltd. No copy
 Original code belongs to "FrenzyYum". Feel free to mode and upgrade.
 https://github.com/FrenzyYum/GenshinWishingBot
 
-###Version 1.3, made by YMY with GPT-4.
+### Version 1.3, made by YMY with GPT-4.
