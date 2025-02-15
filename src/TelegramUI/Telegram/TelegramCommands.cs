@@ -13,6 +13,7 @@ using TelegramUI.Commands;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
 using System.Data.SQLite;
+using Telegram.Bot.Types;
 
 namespace TelegramUI.Telegram
 {
@@ -141,11 +142,11 @@ namespace TelegramUI.Telegram
 
                         if (Wish.HasRolled(e.Message) == 1) // Check if user already rolled
                         {
-                            if (Wish.GetStarglitter(userId) >= 10) // If user have 10 or more Starglitters
+                            if (Wish.GetStarglitter(userId,chatId) >= 10) // If user have 10 or more Starglitters
                             {
-                                Wish.UseStarglitter(userId, 10); // Use it for extra wish (ignores timer)
+                                Wish.UseStarglitter(userId,chatId, 10); // Use it for extra wish (ignores timer)
 
-                                int newBalance = Wish.GetStarglitter(userId); // Check balance after use
+                                int newBalance = Wish.GetStarglitter(userId, chatId); // Check balance after use
 
                                     try
                                     {
@@ -205,7 +206,7 @@ namespace TelegramUI.Telegram
                         //If wish availiable, update wish time
                         Wish.SetWishTime(userId, chatId);
 
-                        var pull = Wish.GetCharacterPull(e.Message);
+                        var onePull = Wish.GetCharacterPull(e.Message,true);
 
                         while (true)
                         {
@@ -213,11 +214,65 @@ namespace TelegramUI.Telegram
                             {
                                 await Bot.SendTextMessageAsync(
                                     e.Message.Chat.Id,
-                                    text: $"{pull[0]}<a href=\"{pull[1]}\">\u200b</a>",
+                                    text: $"{onePull[0]}<a href=\"{onePull[1]}\">\u200b</a>",
                                     parseMode: ParseMode.Html,
                                     disableWebPagePreview: false,
                                     replyToMessageId: e.Message.MessageId);
                                 break;
+                            }
+                            catch (Exception exception)
+                            {
+                                // ignored
+                            }
+                        }
+                        break;
+
+                    case "/wish10":
+                        var userId10 = e.Message.From.Id;
+                        var chatId10 = e.Message.Chat.Id;
+                        int balance = Wish.GetStarglitter(userId10, chatId10);
+
+                        if ( balance>= 100) // Check Starglitter balance
+                        {
+                            Wish.UseStarglitter(userId10,chatId10, 100); // Substract 100 Starglitter
+
+                            List<string[]> pulls = new List<string[]>();
+                            for (int i = 0; i < 10; i++)
+                            {
+                                var pull = Wish.GetCharacterPull(e.Message, false);
+                                pulls.Add(pull);
+                            }
+                            string getWish10Sum = Wish.GetWish10Summary(pulls);
+
+                            int newBalance10 = Wish.GetStarglitter(userId10,chatId10); // Get new balance. Wishes may add starglitter as cashback
+
+                            string resultMessage = string.Format(textsList[7], newBalance10, getWish10Sum);
+                            
+                            //If wish availiable, update wish time
+                            Wish.SetWishTime(userId10, chatId10);
+
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    resultMessage,
+                                    parseMode: ParseMode.Html,
+                                    disableWebPagePreview: true,
+                                    replyToMessageId: e.Message.MessageId);
+                            }
+                            catch (Exception exception)
+                            {
+                                // ignored
+                            }
+                        }
+                        else
+                        {
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    string.Format(textsList[8],balance), // Message about insufficient Starglitter
+                                    replyToMessageId: e.Message.MessageId);
                             }
                             catch (Exception exception)
                             {
@@ -242,6 +297,18 @@ namespace TelegramUI.Telegram
                             $"Daily wish reset for everyone in {e.Message.Chat.Title}!",
                             replyToMessageId: e.Message.MessageId);
                         break;
+
+                    case "/balance":
+                        var userIdcheck = e.Message.From.Id;
+                        var chatIdcheck = e.Message.Chat.Id;
+                        int balanceCheck = Wish.GetStarglitter(userIdcheck, chatIdcheck);
+
+                        await Bot.SendTextMessageAsync(
+                        e.Message.Chat.Id,
+                        $"{ e.Message.From.FirstName}, you have {balanceCheck} Starglitter✨ in {e.Message.Chat.Title}!",
+                        replyToMessageId: e.Message.MessageId);
+                        break;
+
                     default:
                         if (e.Message.Text.StartsWith("/lang "))
                         {
@@ -270,6 +337,66 @@ namespace TelegramUI.Telegram
                         }
                         break;
                 }
+
+                switch (e.Message.Text.Split(' ')[0]) // Беремо першу частину повідомлення (до пробілу)
+                {
+                    case "/addStar":
+                        // Перевірка на правильність адміністраторських прав
+                        if (e.Message.From.Id.ToString() != AdminId()) return;
+
+                        // Перевірка, чи команда відправлена у відповідь на повідомлення користувача
+                        if (e.Message.ReplyToMessage == null || e.Message.ReplyToMessage.From == null)
+                        {
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    "This command must be used in response to user message!",
+                                    replyToMessageId: e.Message.MessageId);
+                                return;
+                            }
+                            catch (Exception exception)
+                            {
+                            }
+                        }
+
+                        // Отримуємо ID користувача та чат
+                        var targetUserId = e.Message.ReplyToMessage.From.Id;
+                        var targetChatId = e.Message.Chat.Id;
+                        int amount = 0;
+
+                        // Перевіряємо чи є параметри (amount) після команди
+                        var args = e.Message.Text.Split(' '); // Розбиваємо повідомлення на частини
+                        if (args.Length < 2 || !int.TryParse(args[1], out amount) || amount <= 0)
+                        {
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    "Please use the format command: /addStar[amount]",
+                                    replyToMessageId: e.Message.MessageId);
+                                return;
+                            }
+                            catch (Exception exception) { }
+                        }
+
+                        // Викликаємо метод для додавання Starglitter
+                        Wish.AddStarglitter(targetUserId, targetChatId, amount);
+                        int newBalance = Wish.GetStarglitter(targetUserId, targetChatId);
+
+                        // Відправка повідомлення про успішне виконання команди
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                $"{amount}✨ have been sent to the user {e.Message.ReplyToMessage.From.FirstName}!\n New balance is: {newBalance}✨",
+                                replyToMessageId: e.Message.MessageId);
+                        }
+                        catch (Exception exception) { }
+
+                        break;
+                }
+
             }
             catch (Exception exception)
             {

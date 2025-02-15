@@ -4,6 +4,8 @@
   "Here's your inventory in {0}, {1}!\n\n{2}",
   "It's empty! There's nothing here! But you can change that by typing /wish",
   "You used 10 Starglitter✨ for extra wish!\nNow your balance: {0}✨",
-  "<i>Subtotal</i>: \n\n5★ Characters: {0}\n5★ Weapon: {1}\n4★ Characters: {2}\n4★ Weapon: {3}\n\n<b>All-time wishes:</b> {4}\n",
-  "Last 5⭐️ Pity: {0}\nLast 4⭐️ Pity{1}\nStarglitter: {2}✨"
+  "<i>Subtotal</i>: \n\n5★ Characters: {0}\n5★ Weapon: {1}\n4★ Characters: {2}\n4★ Weapon: {3}\n\n<b>All-time wishes:</b> {4}\n\n",
+  "Guaranteed Event 5* - {0}\nLast 5⭐️ Pity: {1}/30\nLast 4⭐️ Pity{2}/7\nStarglitter: {3}✨\nLast wish time: {4}",
+  "You wished 10 times! Result:\n{1}\n\nNew balance: {0}✨",
+  "You don't have enough starglitter to do that! \n Your balance: {0}✨"
 ]

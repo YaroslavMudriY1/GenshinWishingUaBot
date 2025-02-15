@@ -13,6 +13,7 @@ using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
 using static System.Net.WebRequestMethods;
 using System.Globalization;
+using System.Text;
 
 namespace TelegramUI.Commands
 {
@@ -57,10 +58,15 @@ namespace TelegramUI.Commands
         private const int FourStarPityThreshold = 6; // One four star every 7 wishes | 7th wish is guaranteed 4* or higher
         private const int FiveStarPityThreshold = 30; // One five star every 31 wishes | 31th wish is guaranteed 5*
 
-        internal static string[] GetCharacterPull(Message message)
+        internal static string[] GetCharacterPull(Message message, bool oneWish)
         {
-            var result = new string[2];
-            var type = RandomizerType(); // Select type (character or weapon)
+
+                var result = new string[2]; //If one wish return wish description and htlm.preview of image
+
+                var result10 = new string[4]; //If 10 wishes return name, stars, type, starglitter
+            
+
+                var type = RandomizerType(); // Select type (character or weapon)
             int rate = type == 0 ? RandomizerCharChance() : RandomizerWeaponChance(); // Select radomizer type
 
             //If randomizers give 3* chars, convert to 3* weapon (no 3* chars in list)
@@ -172,6 +178,7 @@ namespace TelegramUI.Commands
 
             //Total Wishes +1
             cmd3.CommandText = "UPDATE UsersInChats SET TotalWishes = TotalWishes + 1 WHERE UserId = @user AND ChatId = @chat";
+            cmd3.ExecuteNonQuery();
 
             // Get current items count
             cmd3.CommandText = "SELECT Count, Type FROM InventoryItems WHERE UserId = @user AND ChatId = @chat AND ItemId = @wish";
@@ -238,6 +245,11 @@ namespace TelegramUI.Commands
             
             //Output result as message
             result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Title, wish.Stars, wish.Type, wish.TypeDesc, wish.Region, starglitterReward);
+            
+            result10[0] = wish.Name;
+            result10[1] = wish.Stars.ToString();
+            result10[2] = wish.TypeId;
+            result10[3] = starglitterReward.ToString();
 
             //Choosing skin|asset 
             Random wishSkin = new Random();
@@ -286,10 +298,14 @@ namespace TelegramUI.Commands
                 }
             }
 
-
-            return result;
+            if (oneWish)
+            {
+                return result;
+            }
+            else return result10;
+            
         }
-        
+
         //Check if user already rolled today
         internal static int HasRolled(Message message)
         {
@@ -333,7 +349,7 @@ namespace TelegramUI.Commands
         }
 
         //Check user Starglitter balance
-        internal static int GetStarglitter(long userId)
+        internal static int GetStarglitter(long userId, long chatId)
         {
             int balance = 0;
 
@@ -342,7 +358,8 @@ namespace TelegramUI.Commands
 
             using var cmd = new SQLiteCommand(con);
             cmd.Parameters.Add(new SQLiteParameter("@user", userId));
-            cmd.CommandText = "SELECT Starglitter FROM UsersInChats WHERE UserId = @user";
+            cmd.Parameters.Add(new SQLiteParameter("@chat", chatId));
+            cmd.CommandText = "SELECT Starglitter FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
 
             using var rdr = cmd.ExecuteReader();
             if (rdr.Read())
@@ -355,21 +372,69 @@ namespace TelegramUI.Commands
             return balance;
         }
 
+        //Add starglitter to user
+        internal static void AddStarglitter(long userId,long chatId, int amount)
+        {
+
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.Add(new SQLiteParameter("@user", userId));
+            cmd.Parameters.Add(new SQLiteParameter("@chat", chatId));
+            cmd.Parameters.Add(new SQLiteParameter("@amount", amount));
+
+            cmd.CommandText = "UPDATE UsersInChats SET Starglitter = Starglitter + @amount WHERE UserId = @user AND ChatId = @chat";
+            cmd.ExecuteNonQuery();
+
+            con.Close();
+        }
+
         //If user have 10+ Starglitter, use it for wish
-        internal static void UseStarglitter(long userId, int amount)
+        internal static void UseStarglitter(long userId, long chatId, int amount)
         {
             using var con = new SQLiteConnection(MainDb());
             con.Open();
 
             using var cmd = new SQLiteCommand(con);
             cmd.Parameters.Add(new SQLiteParameter("@user", userId));
+            cmd.Parameters.Add(new SQLiteParameter("@chat", chatId));
             cmd.Parameters.Add(new SQLiteParameter("@amount", amount));
 
-            cmd.CommandText = "UPDATE UsersInChats SET Starglitter = Starglitter - @amount WHERE UserId = @user AND Starglitter >= @amount";
+            cmd.CommandText = "UPDATE UsersInChats SET Starglitter = Starglitter - @amount WHERE UserId = @user AND ChatId=@chat AND Starglitter >= @amount";
             cmd.ExecuteNonQuery();
 
             con.Close();
         }
+
+        internal static string GetWish10Summary(List<string[]> pulls)
+        {
+            var groupedPulls = pulls.GroupBy(p => p[1]) // Групуємо за кількістю зірок
+                                    .OrderByDescending(g => int.Parse(g.Key)) // Сортуємо від більшого до меншого
+                                    .ToDictionary(g => g.Key, g => g.ToList());
+
+            var result = new StringBuilder();
+
+            foreach (var starGroup in groupedPulls)
+            {
+                int stars = int.Parse(starGroup.Key);
+                int count = starGroup.Value.Count;
+                string starEmoji = new string('⭐', stars);
+
+                var characters = starGroup.Value.Where(p => p[2] == "character").Select(p => p[0]).ToList();
+                var weapons = starGroup.Value.Where(p => p[2] == "weapon").Select(p => p[0]).ToList();
+
+                result.AppendLine($"{starEmoji} ({count})");
+                if (characters.Count > 0)
+                    result.AppendLine($"Characters: {string.Join(", ", characters)}");
+                if (weapons.Count > 0)
+                    result.AppendLine($"Weapons: {string.Join(", ", weapons)}");
+                result.AppendLine();
+            }
+
+            return result.ToString().Trim();
+        }
+
 
     }
 }

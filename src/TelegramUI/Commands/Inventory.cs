@@ -11,6 +11,8 @@ using Telegram.Bot.Types.Enums;
 using TelegramUI.Strings.Items;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
+using System.Globalization;
+using System;
 
 namespace TelegramUI.Commands
 {
@@ -172,13 +174,14 @@ namespace TelegramUI.Commands
             // Save Pity as variable
             int lastFiveStarPity = 0;
             int lastFourStarPity = 0;
+            bool isEventPity = false;
 
             //Check if User hit Pity variable
             using (var cmd3 = new SQLiteCommand(con))
             {
                 cmd3.Parameters.AddWithValue("@userId", message.From.Id);
                 cmd3.Parameters.AddWithValue("@chatId", message.Chat.Id);
-                cmd3.CommandText = "SELECT FourPity, FivePity FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
+                cmd3.CommandText = "SELECT FourPity, FivePity, FiftyLose FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
 
                 using (var rdr = cmd3.ExecuteReader())
                 {
@@ -186,6 +189,7 @@ namespace TelegramUI.Commands
                     {
                         lastFourStarPity = rdr.GetInt32(0);
                         lastFiveStarPity = rdr.GetInt32(1);
+                        isEventPity = rdr.GetBoolean(2);
                     }
                 }
             }
@@ -207,6 +211,27 @@ namespace TelegramUI.Commands
                 }
             }
 
+            // Get LastWishTime
+            string lastWishTimeFormatted = "N/A"; // If there null in BD, output N/A
+
+            using (var cmd5 = new SQLiteCommand(con))
+            {
+                cmd5.Parameters.AddWithValue("@userId", message.From.Id);
+                cmd5.Parameters.AddWithValue("@chatId", message.Chat.Id);
+                cmd5.CommandText = "SELECT LastWishTime FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
+
+                using (var rdr = cmd5.ExecuteReader())
+                {
+                    if (rdr.Read() && !rdr.IsDBNull(0))
+                    {
+                        var lastWishTime = rdr.GetString(0);
+                        var parsedTime = DateTime.ParseExact(lastWishTime, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        lastWishTimeFormatted = parsedTime.ToString("HH:mm dd.MM.yyyy");
+                    }
+                }
+            }
+
+
             con.Close();
 
             /*
@@ -216,9 +241,28 @@ namespace TelegramUI.Commands
 
                         // Message output Starglitter
                         resultArray[4] += $"\nStarglitter: {starglitter} ✨\n";*/
+            
+            //Separating of event pity output text
+            string eventPity = "";
 
-            //Used strings
-            resultArray[4]= string.Format(generalList[6], lastFiveStarPity, lastFourStarPity, starglitter);
+            if (language == "en")
+            {
+                if (isEventPity) 
+                    eventPity = "yes"; 
+                else if (!isEventPity) 
+                    eventPity = "no";
+            }
+
+            if (language == "ua")
+            {
+                if (isEventPity)
+                    eventPity = "так";
+                else if (!isEventPity)
+                    eventPity = "ні";
+            }
+
+            //Use of Strings/General
+            resultArray[4]= string.Format(generalList[6],eventPity, lastFiveStarPity, lastFourStarPity, starglitter, lastWishTimeFormatted);
 
             var results = resultArray[0] + resultArray[1] + resultArray[2] + resultArray[3] + resultArray[4];
 
