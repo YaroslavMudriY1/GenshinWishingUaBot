@@ -34,10 +34,14 @@
       <None Remove="Strings\General\ua.json" />
       <None Remove="Strings\Items\en.json" />
       <None Remove="Strings\Items\ua.json" />
+      <None Remove="Strings\Misc\jokes_en.json" />
+      <None Remove="Strings\Misc\jokes_ua.json" />
       <EmbeddedResource Include="Strings\Items\en.json" />
       <None Remove="Strings\General\en.json" />
       <EmbeddedResource Include="Strings\General\en.json" />
       <EmbeddedResource Include="Strings\Items\ua.json" />
+      <EmbeddedResource Include="Strings\Misc\jokes_en.json" />
+      <EmbeddedResource Include="Strings\Misc\jokes_ua.json" />
     </ItemGroup>
 
 </Project>

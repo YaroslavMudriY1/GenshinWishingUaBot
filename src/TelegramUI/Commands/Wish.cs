@@ -407,10 +407,77 @@ namespace TelegramUI.Commands
             con.Close();
         }
 
+        // Add DoAutoUse column if it doesn't exist
+        internal static void EnsureDoAutoUseColumnExists()
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+            using var cmd = new SQLiteCommand(con);
+
+            // Check if column exists
+            cmd.CommandText = "PRAGMA table_info(UsersInChats)";
+            using var rdr = cmd.ExecuteReader();
+            bool columnExists = false;
+
+            while (rdr.Read())
+            {
+                if (rdr["name"].ToString() == "DoAutoUse")
+                {
+                    columnExists = true;
+                    break;
+                }
+            }
+
+            if (!columnExists)
+            {
+                // Add column with default value of true (1)
+                var alterCmd = new SQLiteCommand("ALTER TABLE UsersInChats ADD COLUMN DoAutoUse INTEGER DEFAULT 1", con);
+                alterCmd.ExecuteNonQuery();
+            }
+
+            con.Close();
+        }
+
+        // Get user's auto-wish setting
+        internal static bool GetAutoWishSetting(long userId, long chatId)
+        {
+            bool autoWish = true; // Default to true
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.Add(new SQLiteParameter("@user", userId));
+            cmd.Parameters.Add(new SQLiteParameter("@chat", chatId));
+            cmd.CommandText = "SELECT DoAutoUse FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
+            using var rdr = cmd.ExecuteReader();
+            if (rdr.Read())
+            {
+                autoWish = rdr.GetInt32(0) == 1;
+            }
+            con.Close();
+            return autoWish;
+        }
+
+        // Toggle auto-wish setting
+        internal static void ToggleAutoWishSetting(long userId, long chatId)
+        {
+            bool currentSetting = GetAutoWishSetting(userId, chatId);
+            int newValue = currentSetting ? 0 : 1;
+
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.Add(new SQLiteParameter("@user", userId));
+            cmd.Parameters.Add(new SQLiteParameter("@chat", chatId));
+            cmd.Parameters.Add(new SQLiteParameter("@value", newValue));
+            cmd.CommandText = "UPDATE UsersInChats SET DoAutoUse = @value WHERE UserId = @user AND ChatId = @chat";
+            cmd.ExecuteNonQuery();
+            con.Close();
+        }
+
         internal static string GetWish10Summary(List<string[]> pulls)
         {
-            var groupedPulls = pulls.GroupBy(p => p[1]) // Групуємо за кількістю зірок
-                                    .OrderByDescending(g => int.Parse(g.Key)) // Сортуємо від більшого до меншого
+            var groupedPulls = pulls.GroupBy(p => p[1]) // Group by stars
+                                    .OrderByDescending(g => int.Parse(g.Key)) // Descending sort
                                     .ToDictionary(g => g.Key, g => g.ToList());
 
             var result = new StringBuilder();

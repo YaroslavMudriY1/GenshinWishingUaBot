@@ -1,5 +1,5 @@
 ﻿[
-  "{0}\n\n{1}, you have received {3}, - {2}!\n\n{2} is a {5}, {4}⭐️ {6} from {7}.\n\nFor this wish you get {8}Starglitter✨!",
+  "{0}\n\n{1}, you have received {3}, - {2}!\n\n{2} is a {5}, {4}⭐️ {6} from {7}.\n\nFor this wish you get {8} Starglitter✨!",
   "Oh no! You've already wished!😥\nYou have not enough Starglitter✨ to do extra wish!🥺\nYou can wish again in {0}h:{1}m!🕑",
   "Here's your inventory in {0}, {1}!\n\n{2}",
   "It's empty! There's nothing here! But you can change that by typing /wish",
@@ -7,5 +7,24 @@
   "<i>Subtotal</i>: \n\n5★ Characters: {0}\n5★ Weapon: {1}\n4★ Characters: {2}\n4★ Weapon: {3}\n\n<b>All-time wishes:</b> {4}\n\n",
   "Guaranteed Event 5* - {0}\nLast 5⭐️ Pity: {1}/30\nLast 4⭐️ Pity{2}/7\nStarglitter: {3}✨\nLast wish time: {4}",
   "You wished 10 times! Result:\n{1}\n\nNew balance: {0}✨",
-  "You don't have enough starglitter to do that! \n Your balance: {0}✨"
+  "You don't have enough starglitter to do that!\nYour balance: {0}✨",
+  "Oh no! You've already wished!😥\nYou have enough Starglitter ({0}✨), but Auto-wish is off!🥺\nNever late to change that through /settings\nYou can wish again in {1}h:{2}m!🕑",
+  "ID of item {0} is {1}.",
+  "Item '{0}' not found.",
+  "Usage: /get_id <item_name>. Item name displays in inventory.",
+  "Please, enter attributes (amount1) (ItemId1) (amount2) (ItemId2).\nSimple sample: /trade [amount_I_give] [ItemId_I_give] [amount_I_want] [ItemId_I_want].\n /trade 2 diluc 1 furina - I give two Diluc for one Furina.",
+  "You don't have enough {0} (need {1}).",
+  "Item with ID {0} not found. Use /get_id please!",
+  "You sold {0}х {1} and received {2} starglitter. Your new balance: {3}✨",
+  "Usage: /sell [amount] <itemId>",
+  "<b>{1}'s inventory:</b>\n\n{2}",
+  "To sell items, use the command <code>/sell [amount] &lt;itemId&gt;</code>\n\nRewards for selling items:\n{0}\n{1}\n{2}\n\nYou can find item IDs with the <code>/get_id &lt;item_name&gt;</code> command.",
+  "• 5-star items: 25 starglitter each ✨",
+  "• 4-star items: 10 starglitter each ✨",
+  "• 3-star items: 1 starglitter each ✨",
+  "Use <code>/inv</code> to view your current inventory. Items are organized by rarity (5★, 4★, 3★) and show the quantity of each item you own.",
+  "To find an item's ID, use the command <code>/get_id &lt;item_name&gt;</code>. You'll need the item ID for commands like <code>/sell</code> and <code>/trade</code>.",
+  "Use <code>/wish</code> to make a wish. You can wish once every 2 hours.\n\nUse <code>/wish10</code> to make 10 wishes at once for 100 starglitter ✨.",
+  "Trading feature is coming soon! You'll be able to trade items with other players using <code>/trade &lt;itemId&gt;</code>.",
+  "Available commands:\n\n<code>/wish</code> - Make a wish (every 2 hours)\n<code>/wish10</code> - Make 10 wishes (costs 100 starglitter)\n<code>/inv</code> - View your inventory\n<code>/get_id &lt;item_name&gt;</code> - Get an item's ID\n<code>/sell [amount] &lt;itemId&gt;</code> - Sell items for starglitter\n<code>/balance</code> - Check your starglitter balance"
 ]
