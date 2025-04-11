@@ -9,7 +9,7 @@ A Telegram chat bot that simulates Genshin Impact wishes. Built with C#, .NET 5.
 - Bot can react to key words like "how to *wish*?" if sended in reply to bot messages. Check other commands by "`?`".
 - *Added jokes!* Just send "joke" in reply to bot! Happy fools day! Oh wait...
 
-###Previous changes (Major Update 1.3)
+### Previous changes (Major Update 1.3)
 - Added **a lot of weapons**, missing characters, assets, in short filling gaps to the last patch (5.3*). <ins>Reworked strings (added new details), now English and Ukrainian versions matches.</ins>
 - Enhanced **skin system**, now it randomized. For characters with alternate skins (*Amber, Jean, Mona, Rosaria*) alternate skin chance is **50%** (event skin more priority). For event skins (lantern rite, summer) chance is **30%**. For 5✧ skins (*Diluc*) chance is **20%**.
 - Added **50/50 system**, for event 5✧ weapons and characters. If hits 5✧, randomizer (50/50) checks if it event one. If you lose, it'll be saved in DB, and next time you get guaranteed event 5✧. Check "Event 5✧" in `/inv`.
