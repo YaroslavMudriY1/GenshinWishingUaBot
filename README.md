@@ -2,9 +2,14 @@
 
 A Telegram chat bot that simulates Genshin Impact wishes. Built with C#, .NET 5.0 and SQLite as RDBMS.
 
-***Current version 5.3' (ua/en)***
+***Current version 5.4' (ua/en)***
 
-### Patch Note (Major Update 1.3)
+### Patch Note (Major Update 1.4)
+- New commands! Now you can `/trade` and `/sell` your items! For that commands you need to know item ID (by `/get_id`) Besides, you can now inspect other user's inventory using `/get_inv` in reply message! If you don't know how use that commands - don't worry! Just type command (without attributes) in chat and bot will answer!
+- Bot can react to key words like "how to *wish*?" if sended in reply to bot messages. Check other commands by "`?`".
+- *Added jokes!* Just send "joke" in reply to bot! Happy fools day! Oh wait...
+
+###Previous changes (Major Update 1.3)
 - Added **a lot of weapons**, missing characters, assets, in short filling gaps to the last patch (5.3*). <ins>Reworked strings (added new details), now English and Ukrainian versions matches.</ins>
 - Enhanced **skin system**, now it randomized. For characters with alternate skins (*Amber, Jean, Mona, Rosaria*) alternate skin chance is **50%** (event skin more priority). For event skins (lantern rite, summer) chance is **30%**. For 5✧ skins (*Diluc*) chance is **20%**.
 - Added **50/50 system**, for event 5✧ weapons and characters. If hits 5✧, randomizer (50/50) checks if it event one. If you lose, it'll be saved in DB, and next time you get guaranteed event 5✧. Check "Event 5✧" in `/inv`.
@@ -15,7 +20,7 @@ A Telegram chat bot that simulates Genshin Impact wishes. Built with C#, .NET 5.
 - **Expanded inventory!** Now you can see your pity, all-time wishes and starglitter balance in `/inv`.
 - **Added 10 wishes command!** You can spend 100✨ to quickly make ten wishes. Results be in one message.
 
-*'current Genshin Impact patch - 5.3. Last bot update - 15.02.2025
+*'current Genshin Impact patch - 5.4. Last bot update - 11.04.2025
 
 ### If you want to try bot, check `@WishGenshinUaBot` in telegram. (works only in groups)
 
@@ -55,4 +60,4 @@ Genshin Impact content and materials are a copyright of miHoYo Co., Ltd. No copy
 Original code belongs to "FrenzyYum". Feel free to mode and upgrade.
 https://github.com/FrenzyYum/GenshinWishingBot
 
-### Version 1.3, made by YMY with GPT-4.
+### Version 1.3, made by YMY with GPT-4. 
