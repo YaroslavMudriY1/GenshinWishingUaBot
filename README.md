@@ -60,4 +60,4 @@ Genshin Impact content and materials are a copyright of miHoYo Co., Ltd. No copy
 Original code belongs to "FrenzyYum". Feel free to mode and upgrade.
 https://github.com/FrenzyYum/GenshinWishingBot
 
-### Version 1.3, made by YMY with GPT-4. 
+### Version 1.4, made by YMY with GPT-4o and Claude. 
