@@ -61,12 +61,10 @@ namespace TelegramUI.Commands
         internal static string[] GetCharacterPull(Message message, bool oneWish)
         {
 
-                var result = new string[2]; //If one wish return wish description and htlm.preview of image
+            var result = new string[2];     //If one wish return wish description and htlm.preview of image
+            var result10 = new string[4];   //If 10 wishes return name, stars, type, starglitter
+            var type = RandomizerType();    // Select type (character or weapon)
 
-                var result10 = new string[4]; //If 10 wishes return name, stars, type, starglitter
-            
-
-                var type = RandomizerType(); // Select type (character or weapon)
             int rate = type == 0 ? RandomizerCharChance() : RandomizerWeaponChance(); // Select radomizer type
 
             //If randomizers give 3* chars, convert to 3* weapon (no 3* chars in list)
@@ -147,7 +145,8 @@ namespace TelegramUI.Commands
             cmd3.CommandText = "INSERT OR IGNORE INTO UsersInChats(UserId, ChatId) VALUES(@user, @chat)";
             cmd3.ExecuteNonQuery();
 
-            /*            // Update that user has rolled in the chat today
+            /*  Old code for rolling in chat today. Now using - SetWishTime 
+              // Update that user has rolled in the chat today
                         cmd3.CommandText = "UPDATE UsersInChats SET HasRolled = 1 WHERE UserId = @user AND ChatId = @chat";
                         cmd3.ExecuteNonQuery();*/
 
@@ -192,7 +191,7 @@ namespace TelegramUI.Commands
             }
             rdr2.Close();
 
-            // Starglitter
+            // Starglitter calculation
             int starglitterReward = 0;
             if (itemCount == 1) // Fisrt copy of item
             {
@@ -348,6 +347,75 @@ namespace TelegramUI.Commands
             cmd.ExecuteNonQuery();
         }
 
+        // Check if user has already claimed daily reward today
+        public static bool HasClaimedDailyReward(long userId, long chatId)
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.AddWithValue("@user", userId);
+            cmd.Parameters.AddWithValue("@chat", chatId);
+            cmd.CommandText = "SELECT LastDailyReward FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
+
+            var lastDailyReward = cmd.ExecuteScalar();
+            con.Close();
+
+            if (lastDailyReward == null || lastDailyReward == DBNull.Value)
+            {
+                return false; // Never claimed before
+            }
+
+            var lastClaimDate = DateTime.Parse(lastDailyReward.ToString());
+            var today = DateTime.Now.Date;
+
+            return lastClaimDate.Date == today; // Check if claimed today
+        }
+
+        // Set the daily reward claim time for user
+        public static void SetDailyRewardTime(long userId, long chatId)
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.AddWithValue("@user", userId);
+            cmd.Parameters.AddWithValue("@chat", chatId);
+
+            // Save current time in "yyyy-MM-dd HH:mm:ss" format
+            var currentTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+            cmd.Parameters.AddWithValue("@time", currentTime);
+            cmd.CommandText = "UPDATE UsersInChats SET LastDailyReward = @time WHERE UserId = @user AND ChatId = @chat";
+            cmd.ExecuteNonQuery();
+        }
+
+        // Get time until next daily reward is available
+        public static TimeSpan GetTimeUntilNextDailyReward(long userId, long chatId)
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.AddWithValue("@user", userId);
+            cmd.Parameters.AddWithValue("@chat", chatId);
+            cmd.CommandText = "SELECT LastDailyReward FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
+
+            var lastDailyReward = cmd.ExecuteScalar();
+            con.Close();
+
+            if (lastDailyReward == null || lastDailyReward == DBNull.Value)
+            {
+                return TimeSpan.Zero; // Can claim immediately
+            }
+
+            var lastClaimDate = DateTime.Parse(lastDailyReward.ToString());
+            var nextClaimTime = lastClaimDate.Date.AddDays(1); 
+            var timeUntilNext = nextClaimTime - DateTime.Now;
+
+            return timeUntilNext > TimeSpan.Zero ? timeUntilNext : TimeSpan.Zero;
+        }
+
         //Check user Starglitter balance
         internal static int GetStarglitter(long userId, long chatId)
         {
@@ -500,6 +568,40 @@ namespace TelegramUI.Commands
             }
 
             return result.ToString().Trim();
+        }
+
+        // Get Rarity (stars) from pull result. Use for EXP calculation
+        public static int ExtractRarityFromOnePull(string[] pullResult)
+        {
+            //pullResult[0] is the first element of the array, which contains the pull description, including the rarity
+            string pullText = pullResult[0];
+
+            if (pullText.Contains("5⭐️"))
+                return 5;
+            else if (pullText.Contains("4⭐️"))
+                return 4;
+            else if (pullText.Contains("3⭐️"))
+                return 3;
+
+            // Default case if no rarity is found
+            return 3;
+        }
+
+        // Get Rarity (stars) from 10-pull result. Use for EXP calculation
+        public static int ExtractRarityFromTenPull(string[] pullResult)
+        {
+            //pullResult[0] is the first element of the array, which contains the pull description, including the rarity
+            string pullText = pullResult[0];
+
+            if (pullText.Contains("⭐⭐⭐⭐⭐") || pullText.Contains("5⭐️"))
+                return 5;
+            else if (pullText.Contains("⭐⭐⭐⭐") || pullText.Contains("4⭐️"))
+                return 4;
+            else if (pullText.Contains("⭐⭐⭐") || pullText.Contains("3⭐️"))
+                return 3;
+
+            // Deafult case if no rarity is found
+            return 3;
         }
 
 

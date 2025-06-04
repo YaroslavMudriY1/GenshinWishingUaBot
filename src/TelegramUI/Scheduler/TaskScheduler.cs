@@ -49,5 +49,40 @@ namespace TelegramUI.Scheduler
             con.Close();
         }
 
+        // Daily reward reset method - runs at 02:00 daily
+        public void ScheduleDailyRewardReset()
+        {
+            var now = DateTime.Now;
+            var nextReset = new DateTime(now.Year, now.Month, now.Day, 2, 0, 0).AddDays(now.Hour >= 2 ? 1 : 0);
+            var timeLeft = nextReset - now;
+
+            // If bot starts after 02:00, do daily reward reset instantly
+            if (now.Hour >= 2)
+            {
+                DailyRewardReset();
+            }
+
+            var timer = new Timer(_ =>
+            {
+                DailyRewardReset();
+            }, null, timeLeft, TimeSpan.FromDays(1)); // Reset daily rewards every 24 hours
+
+            Timers.Add(timer);
+        }
+
+        private static void DailyRewardReset()
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            using var cmd = new SQLiteCommand(con)
+            {
+                CommandText = "UPDATE UsersInChats SET LastDailyReward = NULL"
+            };
+            cmd.ExecuteNonQuery();
+
+            con.Close();
+        }
+
     }
 }

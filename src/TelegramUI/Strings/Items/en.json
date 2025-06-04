@@ -2747,7 +2747,7 @@
     "typeDesc": "anemo catalyst",
     "title": "Embrace of Enchanting Dreams",
     "region": "Inazuma",
-    "isEvent": true
+    "isEvent": false
   },
   {
     "id": "sunnyMorningSleepin",
@@ -3444,6 +3444,18 @@
     "isEvent": true
   },
   {
+    "id": "vividNotions",
+    "name": "Vivid Notions",
+    "typeId": "weapon",
+    "type": "weapon",
+    "stars": 5,
+    "description": "A trophy made from gemstones from the Collective of Plenty and crystals from the Flower-Feather Clan. It is said to have once belonged to a legendary wrestler.",
+    "typeDesc": "catalyst",
+    "title": "cow bell",
+    "region": "Natlan",
+    "isEvent": true
+  },
+  {
     "id": "iansan",
     "name": "Iansan",
     "typeId": "character",
@@ -3455,7 +3467,54 @@
     "region": "Natlan",
     "isEvent": false
   },
-
+  {
+    "id": "ifa",
+    "name": "Ifa",
+    "typeId": "character",
+    "type": "character",
+    "stars": 4,
+    "description": "A vet from the Flower-Feather Clan, beloved by humans and animals alike. The round creature by his side is his assistant.",
+    "typeDesc": "anemo catalyst",
+    "title": "In the Wake of Wandering Winds",
+    "region": "Natlan",
+    "isEvent": false
+  },
+  {
+    "id": "escoffier",
+    "name": "Escoffier",
+    "typeId": "character",
+    "type": "character",
+    "stars": 5,
+    "description": "A renowned, exacting Fontainian chef. Diligently seeking the pinnacle of culinary excellence.",
+    "typeDesc": "cryo spearman",
+    "title": "Tasteful Excellence",
+    "region": "Fontaine",
+    "isEvent": true
+  },
+  {
+    "id": "symphonistScents",
+    "name": "Symphonist of Scents",
+    "typeId": "weapon",
+    "type": "weapon",
+    "stars": 5,
+    "description": "An elegantly built polearm, said to have been a conductor's baton wielded by a great musician to bridge tune and taste.",
+    "typeDesc": "polearm",
+    "title": "legendary polearm",
+    "region": "Fontaine",
+    "isEvent": true
+  },
+  {
+    "id": "skirk",
+    "name": "Skirk",
+    "typeId": "character",
+    "type": "character",
+    "stars": 5,
+    "description": "The one who despised destiny plucked a young girl from the hand of fate.",
+    "typeDesc": "cryo swordsman",
+    "title": "Void Star",
+    "region": "Abyss",
+    "isEvent": true
+  },
 
   {
     "id": "tartaglia",

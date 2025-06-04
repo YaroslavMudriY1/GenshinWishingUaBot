@@ -15,6 +15,7 @@ using static TelegramUI.Commands.Language;
 using System.Data.SQLite;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
+using TelegramUI.Strings.Misc;
 
 namespace TelegramUI.Telegram
 {
@@ -116,7 +117,7 @@ namespace TelegramUI.Telegram
 
                 switch (msg)
                 {
-                    case "/inv" or "/inventory":
+                    case "/inv" or "/inventory" or "/інвентар":
                         var results = Inventory.InventoryFetch(e.Message);
                         
                         while (true)
@@ -137,7 +138,7 @@ namespace TelegramUI.Telegram
                         }
                         break;
 
-                    case "/wish":
+                    case "/wish" or "/w" or "/молитва":
                         var userId = e.Message.From.Id;
                         var chatId = e.Message.Chat.Id;
 
@@ -157,6 +158,8 @@ namespace TelegramUI.Telegram
                             var lastWishTime = cmd0.ExecuteScalar();
                             con0.Close();
 
+                            // Calculate time difference for the next wish.
+                            // It replace existing TaskScheduler.cs logic [what is wrong. rewrite in next major version]
                             lastWish = DateTime.Parse(lastWishTime.ToString());
                             DateTime nextWish = lastWish.AddHours(2); // add two hour wish interval
                             TimeSpan remaining = nextWish - DateTime.Now;
@@ -234,7 +237,10 @@ namespace TelegramUI.Telegram
                         //If wish availiable, update wish time
                         Wish.SetWishTime(userId, chatId);
 
-                        var onePull = Wish.GetCharacterPull(e.Message,true);
+                        var onePull = Wish.GetCharacterPull(e.Message,true);  // Wish output message      
+                        int starRarity = Wish.ExtractRarityFromOnePull(onePull); //Get wish.Stars from ouput message
+
+                        var rankResult = RankSystem.AddExperience(userId, chatId, starRarity);
 
                         while (true)
                         {
@@ -253,9 +259,34 @@ namespace TelegramUI.Telegram
                                 // ignored
                             }
                         }
+
+                        // If level up - send message
+                        if (rankResult.LeveledUp)
+                        {
+                            var rankTitle = RankSystem.GetRankTitle(rankResult.NewLevel);
+                            var progressBar = RankSystem.GetExpProgressBar(rankResult.CurrentExp, rankResult.ExpToNext);
+
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    $"🎉 <b>Rank Up!</b>\n" +
+                                    $"👤 {HttpUtility.HtmlEncode(e.Message.From.FirstName)}\n" +
+                                    $"📈 Level: {rankResult.NewLevel} {rankTitle}\n" +
+                                    $"🎁 Reward: {rankResult.RewardMessage}\n" +
+                                    $"⚡ EXP: {progressBar}",
+                                    parseMode: ParseMode.Html,
+                                    replyToMessageId: e.Message.MessageId);
+                            }
+                            catch (Exception exception)
+                            {
+                                // ignored
+                            }
+                        }
                         break;
 
-                    case "/wish10":
+
+                    case "/wish10"or "/w10" or "/десятка":
                         var userId10 = e.Message.From.Id;
                         var chatId10 = e.Message.Chat.Id;
                         int balance = Wish.GetStarglitter(userId10, chatId10);
@@ -265,10 +296,24 @@ namespace TelegramUI.Telegram
                             Wish.UseStarglitter(userId10,chatId10, 100); // Substract 100 Starglitter
 
                             List<string[]> pulls = new List<string[]>();
+                            int totalExpGained = 0;
+                            bool leveledUp = false;
+                            RankSystem.RankUpResult finalRankResult = new RankSystem.RankUpResult();
+
                             for (int i = 0; i < 10; i++)
                             {
                                 var pull = Wish.GetCharacterPull(e.Message, false);
                                 pulls.Add(pull);
+
+                                // Gain experience based on the rarity of every pull
+                                int starRarity10 = Wish.ExtractRarityFromTenPull(pull);
+                                var rankResult10 = RankSystem.AddExperience(userId10, chatId10, starRarity10);
+
+                                if (rankResult10.LeveledUp)
+                                {
+                                    leveledUp = true;
+                                    finalRankResult = rankResult10; // Save the final rank result
+                                }
                             }
                             string getWish10Sum = Wish.GetWish10Summary(pulls);
 
@@ -292,7 +337,31 @@ namespace TelegramUI.Telegram
                             {
                                 // ignored
                             }
-                        }
+
+                            // Send level up message with rewards and progress bar
+                            if (leveledUp)
+                            {
+                                var rankTitle = RankSystem.GetRankTitle(finalRankResult.NewLevel);
+                                var progressBar = RankSystem.GetExpProgressBar(finalRankResult.CurrentExp, finalRankResult.ExpToNext);
+
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat.Id,
+                                        $"🎉 <b>Rank Up!</b>\n" +
+                                        $"👤 {HttpUtility.HtmlEncode(e.Message.From.FirstName)}\n" +
+                                        $"📈 Level: {finalRankResult.NewLevel} {rankTitle}\n" +
+                                        $"🎁 Reward: {finalRankResult.RewardMessage}\n" +
+                                        $"⚡ EXP: {progressBar}",
+                                        parseMode: ParseMode.Html,
+                                        replyToMessageId: e.Message.MessageId);
+                                }
+                                catch (Exception exception)
+                                {
+                                    // ignored
+                                }
+                            }
+                            }
                         else
                         {
                             try
@@ -309,14 +378,138 @@ namespace TelegramUI.Telegram
                         }
                         break;
 
-                    case "/trade":
+                    // If user wants to check their rank
+                    case "/rank" or "/myRank" or "/r" or "/level" or "/myLevel" or "/lvl":
+                        var userIdRank = e.Message.From.Id;
+                        var chatIdRank = e.Message.Chat.Id;
+                        var (level, exp, expToNext) = RankSystem.GetUserRankInfo(userIdRank, chatIdRank);
+                        var title = RankSystem.GetRankTitle(level);
+                        var progress = RankSystem.GetExpProgressBar(exp, expToNext);
+
                         await Bot.SendTextMessageAsync(
-                        e.Message.Chat.Id,
-                        string.Format(textsList[13]), // Message about /trade command
-                        replyToMessageId: e.Message.MessageId);
+                            e.Message.Chat.Id,
+                            $"👤 <b>{HttpUtility.HtmlEncode(e.Message.From.FirstName)}</b>\n" +
+                            $"📊 Level: {level} {title}\n" +
+                            $"⚡ EXP: {progress}\n" +
+                            $"📈 Next level: {expToNext} EXP needed",
+                            parseMode: ParseMode.Html,
+                            replyToMessageId: e.Message.MessageId);
                         break;
 
-                    case string s when s.StartsWith("/trade "):
+                    case "/me" or "/info":
+                        var userInfo = Inventory.GetUserInfo(e.Message);
+
+                        while (true)
+                        {
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat,
+                                    userInfo,
+                                    replyToMessageId: e.Message.MessageId,
+                                    parseMode: ParseMode.Html);
+                                break;
+                            }
+                            catch (Exception exception)
+                            {
+                                // ignored
+                            }
+                        }
+                        break;
+
+                    case "/getInfo" or "/get_info":
+                        if (e.Message.ReplyToMessage != null)
+                        {
+                            var targetUser = e.Message.ReplyToMessage.From;
+                            var targetUserId = targetUser.Id;
+                            string targetUsername = targetUser.FirstName;
+
+                            var targetUserInfo = Inventory.GetUserInfo(e.Message, targetUserId, targetUsername);
+
+                            while (true)
+                            {
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat,
+                                        targetUserInfo,
+                                        replyToMessageId: e.Message.MessageId,
+                                        parseMode: ParseMode.Html);
+                                    break;
+                                }
+                                catch (Exception exception)
+                                {
+                                    // ignored
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // If command sent not in reply
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                "This command must be used in reply to another user's message.",
+                                replyToMessageId: e.Message.MessageId);
+                        }
+                        break;
+
+                    case "/daily":
+                        var dailyUserId = e.Message.From.Id;
+                        var dailyChatId = e.Message.Chat.Id;
+
+                        // Check if user has already claimed daily reward today
+                        if (Wish.HasClaimedDailyReward(dailyUserId, dailyChatId))
+                        {
+                            var timeUntilNext = Wish.GetTimeUntilNextDailyReward(dailyUserId, dailyChatId);
+                            var hoursLeft = timeUntilNext.Hours;
+                            var minutesLeft = timeUntilNext.Minutes;
+
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    $"⏰ {e.Message.From.FirstName}, you have already claimed your daily reward today!\n" +
+                                    $"Come back in {hoursLeft}h {minutesLeft}m for your next daily reward.",
+                                    replyToMessageId: e.Message.MessageId);
+                            }
+                            catch (Exception exception)
+                            {
+                                // Exception ignored
+                            }
+                            return;
+                        }
+
+                        // Give daily reward (3 Starglitter)
+                        const int dailyRewardAmount = 3;
+                        Wish.AddStarglitter(dailyUserId, dailyChatId, dailyRewardAmount);
+                        Wish.SetDailyRewardTime(dailyUserId, dailyChatId);
+
+                        var newDailyBalance = Wish.GetStarglitter(dailyUserId, dailyChatId);
+
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                $"🎁 Daily reward claimed!\n" +
+                                $"{e.Message.From.FirstName} received {dailyRewardAmount}✨ Starglitter!\n" +
+                                $"Current balance: {newDailyBalance}✨\n\n" +
+                                $"Come back tomorrow for your next daily reward!",
+                                replyToMessageId: e.Message.MessageId);
+                        }
+                        catch (Exception exception)
+                        {
+                            // Exception ignored
+                        }
+                        break;
+
+                    case "/trade" or "/трейд":
+                        await Bot.SendTextMessageAsync(
+                            e.Message.Chat.Id,
+                            string.Format(textsList[13]), // Message about /trade command
+                            replyToMessageId: e.Message.MessageId);
+                        break;
+
+                    case string s when s.StartsWith("/trade ") || s.StartsWith("/трейд "):
                         if (e.Message.ReplyToMessage == null)
                         {
                             await Bot.SendTextMessageAsync(
@@ -410,6 +603,7 @@ namespace TelegramUI.Telegram
                                 replyToMessageId: e.Message.MessageId);
                         }
                         break;
+
                     case "/sell":
                         await Bot.SendTextMessageAsync(
                                        e.Message.Chat.Id,
@@ -533,7 +727,7 @@ namespace TelegramUI.Telegram
                             }
                         }
                         break;
-                    case "/get_info" or "/get_inv":
+                    case "/get_inv":
                         if (e.Message.ReplyToMessage != null)
                         {
                             var targetUser = e.Message.ReplyToMessage.From;
@@ -568,6 +762,7 @@ namespace TelegramUI.Telegram
                                 replyToMessageId: e.Message.MessageId);
                         }
                         break;
+
                     case "/resetUser":
                         if (e.Message.From.Id.ToString() != AdminId()) return;
                         Admin.ResetUser(e.Message);
@@ -576,6 +771,7 @@ namespace TelegramUI.Telegram
                             $"Wish reset for {e.Message.ReplyToMessage.From.FirstName}!",
                             replyToMessageId: e.Message.MessageId);
                         break;
+
                     case "/resetChat":
                         if (e.Message.From.Id.ToString() != AdminId()) return;
                         Admin.ResetChat(e.Message);
@@ -585,7 +781,7 @@ namespace TelegramUI.Telegram
                             replyToMessageId: e.Message.MessageId);
                         break;
 
-                    case "/balance":
+                    case "/balance" or "/myBalance" or "/b":
                         var userIdcheck = e.Message.From.Id;
                         var chatIdcheck = e.Message.Chat.Id;
                         int balanceCheck = Wish.GetStarglitter(userIdcheck, chatIdcheck);
@@ -618,6 +814,12 @@ namespace TelegramUI.Telegram
                             replyToMessageId: e.Message.MessageId);
                         break;
 
+                    case "/ask_paimon":
+                        {
+                            await Language.RandomPaimonPhrase(e);
+                            break;
+                        }
+
                     default:
                         if (e.Message.Text.StartsWith("/lang "))
                         {
@@ -638,16 +840,166 @@ namespace TelegramUI.Telegram
                                             ChangeLanguage(e.Message, "ua");
                                             await Bot.SendTextMessageAsync(
                                                 e.Message.Chat,
-                                                "Мова бота тепер державна.");
+                                                "Мова бота в цьому чаті тепер державна.");
                                             break;
                                     }
                                 }
                             }
                         }
+                        else if (e.Message.Text.StartsWith("/gift "))
+                        {
+                            // Check if command was sent in reply to a message
+                            if (e.Message.ReplyToMessage == null || e.Message.ReplyToMessage.From == null)
+                            {
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat.Id,
+                                        "This command must be used in response to user message!",
+                                        replyToMessageId: e.Message.MessageId);
+                                    return;
+                                }
+                                catch { }
+                            }
+
+                            // Get sender, receiver and chat ID
+                            var senderId = e.Message.From.Id;
+                            var receiverId = e.Message.ReplyToMessage.From.Id;
+                            var giftChatId = e.Message.Chat.Id;
+
+                            // If same user as sender and receiver
+                            if (senderId == receiverId)
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    "You can't gift ✨ to yourself! 😅",
+                                    replyToMessageId: e.Message.MessageId);
+                                return;
+                            }
+
+                            // Parsing amount of gift
+                            int giftAmount = 0;
+                            var giftArgs = e.Message.Text.Split(' ');
+                            if (giftArgs.Length < 2 || !int.TryParse(giftArgs[1], out giftAmount) || giftAmount <= 0)
+                            {
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat.Id,
+                                        "Command format: /gift [amount]",
+                                        replyToMessageId: e.Message.MessageId);
+                                    return;
+                                }
+                                catch { }
+                            }
+
+                            // Check sender's balance
+                            int senderBalance = Wish.GetStarglitter(senderId, giftChatId);
+                            if (senderBalance < giftAmount)
+                            {
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat.Id,
+                                        $"You don't have enough ✨ to gift! Your balance: {senderBalance}✨.",
+                                        replyToMessageId: e.Message.MessageId);
+                                    return;
+                                }
+                                catch { }
+                            }
+
+                            // Withdraw from sender and add to receiver
+                            Wish.AddStarglitter(senderId, giftChatId, -giftAmount);     // subtract
+                            Wish.AddStarglitter(receiverId, giftChatId, giftAmount);    // add
+
+                            int newSenderBalance = Wish.GetStarglitter(senderId, giftChatId);
+                            int newReceiverBalance = Wish.GetStarglitter(receiverId, giftChatId);
+
+                            // Message about successful gift transfer
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    $"✨ {giftAmount} gifted to user {e.Message.ReplyToMessage.From.FirstName}!\n" +
+                                    $"Your new balance: {newSenderBalance}✨.\n" +
+                                    $"Receiver balance: {newReceiverBalance}✨.",
+                                    replyToMessageId: e.Message.MessageId);
+                            }
+                            catch
+                            {
+                                //ignored 
+                            }
+                        }
+                        else if (e.Message.Text.StartsWith("/addStar "))
+                        {
+                            // Check admin rights
+                            if (e.Message.From.Id.ToString() != AdminId()) return;
+
+                            // Check if message send as reply
+                            if (e.Message.ReplyToMessage == null || e.Message.ReplyToMessage.From == null)
+                            {
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat.Id,
+                                        "This command must be used in response to user message!",
+                                        replyToMessageId: e.Message.MessageId);
+                                    return;
+                                }
+                                catch (Exception exception)
+                                {
+                                    //ignored
+                                }
+                            }
+
+                            // Get user and chat ID
+                            var targetUserId = e.Message.ReplyToMessage.From.Id;
+                            var targetChatId = e.Message.Chat.Id;
+                            int starAmount = 0;
+
+                            // Check if attributes (amount) exists
+                            var args = e.Message.Text.Split(' '); // Split message on parts
+                            if (args.Length < 2 || !int.TryParse(args[1], out starAmount) || starAmount <= 0)
+                            {
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat.Id,
+                                        "Please use the format command: /addStar [amount]",
+                                        replyToMessageId: e.Message.MessageId);
+                                    return;
+                                }
+                                catch (Exception exception) { }
+                            }
+
+                            // Call add starglitter method
+                            Wish.AddStarglitter(targetUserId, targetChatId, starAmount);
+                            int newBalance = Wish.GetStarglitter(targetUserId, targetChatId);
+
+                            // Send message about successful adding starglitter
+                            try
+                            {
+                                await Bot.SendTextMessageAsync(
+                                    e.Message.Chat.Id,
+                                    $"{starAmount}✨ have been sent to the user {e.Message.ReplyToMessage.From.FirstName}!\n New balance is: {newBalance}✨",
+                                    replyToMessageId: e.Message.MessageId);
+                            }
+                            catch (Exception exception)
+                            {
+                                //ignored
+                            }
+                        }
+                        else if (e.Message.Text.StartsWith("/") && e.Message.ReplyToMessage.From.Id == Bot.BotId)
+                            await Bot.SendTextMessageAsync(
+                           chatId: e.Message.Chat.Id,
+                           text: $"EHE TE NANDAYO?!!\n Non existing command!",
+                           replyToMessageId: e.Message.MessageId);
+                        
                         break;
                 }
 
                 // This will handle FAQ responses when users reply to the bot's messages
+                // Also have entertainment functions (for fun)
                 // Check if message is a reply to the bot's message
                 if (e.Message.ReplyToMessage != null && e.Message.ReplyToMessage.From.Id == Bot.BotId)
                 {
@@ -656,9 +1008,10 @@ namespace TelegramUI.Telegram
 
                     //Jokes (rofls)
                     if (lowerMessage.Contains("анекдот")||
+                        lowerMessage.Contains("мем") ||
                         lowerMessage.Contains("жарт")||
                         lowerMessage.Contains("смішнявка")||
-                        lowerMessage.Contains("сміх")||
+                        lowerMessage.Contains("meme") ||
                         lowerMessage.Contains("rofl")||
                         lowerMessage.Contains("joke"))
                     {
@@ -768,6 +1121,7 @@ namespace TelegramUI.Telegram
                     }
                     // FAQ patterns for general help
                     else if (lowerMessage.Contains("допомога") ||
+                             lowerMessage.Contains("хелп") ||
                              lowerMessage.Contains("help") ||
                              lowerMessage.Contains("помощь") ||
                              lowerMessage == "?")
@@ -785,66 +1139,68 @@ namespace TelegramUI.Telegram
                             // ignored
                         }
                     }
-                }
-
-                switch (e.Message.Text.Split(' ')[0]) // Get first part of message (before space)
-                {
-                    case "/addStar":
-                        // Check admin rights
-                        if (e.Message.From.Id.ToString() != AdminId()) return;
-
-                        // Check if message send as reply
-                        if (e.Message.ReplyToMessage == null || e.Message.ReplyToMessage.From == null)
-                        {
-                            try
-                            {
-                                await Bot.SendTextMessageAsync(
-                                    e.Message.Chat.Id,
-                                    "This command must be used in response to user message!",
-                                    replyToMessageId: e.Message.MessageId);
-                                return;
-                            }
-                            catch (Exception exception)
-                            {
-                                //ignored
-                            }
-                        }
-
-                        // Get user and chat ID
-                        var targetUserId = e.Message.ReplyToMessage.From.Id;
-                        var targetChatId = e.Message.Chat.Id;
-                        int amount = 0;
-
-                        // Check if attributes (amount) exists
-                        var args = e.Message.Text.Split(' '); // Split message on parts
-                        if (args.Length < 2 || !int.TryParse(args[1], out amount) || amount <= 0)
-                        {
-                            try
-                            {
-                                await Bot.SendTextMessageAsync(
-                                    e.Message.Chat.Id,
-                                    "Please use the format command: /addStar[amount]",
-                                    replyToMessageId: e.Message.MessageId);
-                                return;
-                            }
-                            catch (Exception exception) { }
-                        }
-
-                        // Call add starglitter method
-                        Wish.AddStarglitter(targetUserId, targetChatId, amount);
-                        int newBalance = Wish.GetStarglitter(targetUserId, targetChatId);
-
-                        // Sent message about succesful adding starglitter
+                    else if (lowerMessage.Contains("emergency") || (lowerMessage.Contains("food")))
+                    {
                         try
                         {
                             await Bot.SendTextMessageAsync(
                                 e.Message.Chat.Id,
-                                $"{amount}✨ have been sent to the user {e.Message.ReplyToMessage.From.FirstName}!\n New balance is: {newBalance}✨",
-                                replyToMessageId: e.Message.MessageId);
+                                "Don't eat Paimon!",
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
                         }
-                        catch (Exception exception) { }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
+                    else if (lowerMessage.Contains("ai"))
+                    {
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                $"Paimon, is this true?",
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
+                    else if (lowerMessage.Contains("ascii"))
+                    {
+                        var asciiArt = OtherStrings.GetASCIIPaimon();
 
-                        break;
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                $"<pre>{asciiArt}</pre>",
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                text: "Please, give me a break!\nUse /help for assistance.",
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
                 }
 
             }
@@ -860,5 +1216,6 @@ namespace TelegramUI.Telegram
                     $"Error: {exception.Message}\n{exception.StackTrace}\n\nEntity: {entity}");
             }
         }
+
     }
 }

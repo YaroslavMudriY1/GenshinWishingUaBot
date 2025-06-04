@@ -14,11 +14,13 @@ namespace TelegramUI
 {
     public static class Program
     {
-        //[Obsolete]
         private static void Main()
         {
-            TaskScheduler.Instance.ScheduleDailyReset();
+            TaskScheduler.Instance.ScheduleDailyReset(); // Reset wish at startup
+            TaskScheduler.Instance.ScheduleDailyRewardReset(); // Reset daily rewards at startup
 
+            //[Obsolete]
+            // Need to rewrite this in future versions
             Bot.OnMessage += TelegramCommands.BotOnMessage;
             Bot.OnCallbackQuery += BotOnCallbackQueryReceived;
 
@@ -27,7 +29,7 @@ namespace TelegramUI
             Bot.StopReceiving();
         }
 
-        //Callback handler
+        //Callback handler (for inline buttons and callback queries)
         private static async void BotOnCallbackQueryReceived(object sender, CallbackQueryEventArgs e)
         {
             var callbackQuery = e.CallbackQuery;

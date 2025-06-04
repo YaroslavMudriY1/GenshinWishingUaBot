@@ -1,0 +1,32 @@
+﻿{
+  "en": {
+    "rank_up_message": "🎉 <b>Rank Up!</b>\n👤 {0}\n📈 Level: {1} {2}\n🎁 Reward: {3}\n⚡ EXP: {4}",
+    "rank_info_message": "👤 <b>{0}</b>\n📊 Level: {1} {2}\n⚡ EXP: {3}\n📈 Next level: {4} EXP needed",
+    "rank_titles": {
+      "newcomer": "🆕 Newcomer",
+      "beginner": "👤 Beginner",
+      "novice": "🌱 Novice",
+      "hunter": "🎯 Hunter",
+      "adventurer": "⚔️ Adventurer",
+      "knight": "🛡️ Knight",
+      "adeptus": "🗡️ Adeptus",
+      "archon": "⚡ Archon",
+      "celestial_master": "🌟 Celestial Master"
+    }
+  },
+  "ua": {
+    "rank_up_message": "🎉 <b>Підвищення рангу!</b>\n👤 {0}\n📈 Рівень: {1} {2}\n🎁 Нагорода: {3}\n⚡ Досвід: {4}",
+    "rank_info_message": "👤 <b>{0}</b>\n📊 Рівень: {1} {2}\n⚡ Досвід: {3}\n📈 До наступного рівня: {4} досвіду",
+    "rank_titles": {
+      "newcomer": "🆕 Новачок",
+      "beginner": "👤 Початківець",
+      "novice": "🌱 Учень",
+      "hunter": "🎯 Мисливець",
+      "adventurer": "⚔️ Пригодник",
+      "knight": "🛡️ Лицар",
+      "adeptus": "🗡️ Адепт",
+      "archon": "⚡ Архонт",
+      "celestial_master": "🌟 Небесний Майстер"
+    }
+  }
+}

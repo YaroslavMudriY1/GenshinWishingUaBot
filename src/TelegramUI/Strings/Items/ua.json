@@ -2741,7 +2741,7 @@
     "typeDesc": "анемо каталіст",
     "title": "йокай, що з'їсть твої сни",
     "region": "Інадзуми",
-    "isEvent": true
+    "isEvent": false
   },
   {
     "id": "sunnyMorningSleepin",
@@ -3252,9 +3252,6 @@
     "title": "спис Сейлормун",
     "region": "Фонтейну",
     "isEvent": true
-
-
-
   },
   {
     "id": "kachina",
@@ -3431,10 +3428,22 @@
     "typeId": "character",
     "type": "персонаж",
     "stars": 5,
-    "description": "Хочеш знати звідки береться молоко? Я жеру за трьох.",
+    "description": "Хочеш знати звідки береться молоко?\nЯ жеру за трьох.",
     "typeDesc": "електро каталіст",
     "title": "корівка",
     "region": "Натлану",
+    "isEvent": true
+  },
+  {
+    "id": "vividNotions",
+    "name": "Vivid Notions",
+    "typeId": "weapon",
+    "type": "weapon",
+    "stars": 5,
+    "description": "A trophy made from gemstones from the Collective of Plenty and crystals from the Flower-Feather Clan. It is said to have once belonged to a legendary wrestler.",
+    "typeDesc": "catalyst",
+    "title": "cow bell",
+    "region": "Natlan",
     "isEvent": true
   },
   {
@@ -3448,8 +3457,54 @@
     "title": "місцевий качок",
     "region": "Натлану",
     "isEvent": false
-
-
+  },
+  {
+    "id": "ifa",
+    "name": "Іфа",
+    "typeId": "character",
+    "type": "персонаж",
+    "stars": 4,
+    "description": "Ветеринар з клану Квіткових Пір'їв, улюбленець як людей, так і тварин. Кругла істота поруч із ним — його помічник.",
+    "typeDesc": "анемо каталіст",
+    "title": "Той що слідує вітру",
+    "region": "Натлану",
+    "isEvent": false
+  },
+  {
+    "id": "escoffier",
+    "name": "Ескоф'є",
+    "typeId": "character",
+    "type": "персонаж",
+    "stars": 5,
+    "description": "Ще раз ти сплутаєш моє ім'я з кавою і цей тризуб буде в тебе у дупі!",
+    "typeDesc": "кріо списоносець",
+    "title": "Витонченість смаку",
+    "region": "Фонтейну",
+    "isEvent": true
+  },
+  {
+    "id": "symphonistScents",
+    "name": "Симфоніст ароматів",
+    "typeId": "weapon",
+    "type": "зброя",
+    "stars": 5,
+    "description": "Витончено створений спис, про який кажуть, що це була диригентська паличка великого музиканта, що поєднувала мелодію та смак.",
+    "typeDesc": "спис",
+    "title": "легендарний спис",
+    "region": "Фонтейну",
+    "isEvent": true
+  },
+  {
+    "id": "skirk",
+    "name": "Скірк",
+    "typeId": "character",
+    "type": "персонаж",
+    "stars": 5,
+    "description": "Той, хто зневажав долю, вирвав юну дівчину з рук фатуму.",
+    "typeDesc": "кріо одноручник",
+    "title": "Зоря Порожнечі",
+    "region": "Безодні",
+    "isEvent": true
   },
   {
     "id": "tartaglia",

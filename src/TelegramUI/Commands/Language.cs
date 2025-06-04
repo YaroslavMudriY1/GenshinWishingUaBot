@@ -93,28 +93,10 @@ namespace TelegramUI.Commands
 
         public static async Task RandomJoke(MessageEventArgs e)
         {
-            // Declare jokes list outside of the try block to make it accessible later
-            List<string> jokes = null;
-
             try
             {
                 var resourceName = $"TelegramUI.Strings.Misc.jokes_{GetLanguage(e.Message)}.json";
-                var assembly = typeof(Wish).Assembly;
-                var resourceStream = assembly.GetManifestResourceStream(resourceName);
-
-                if (resourceStream != null)
-                {
-                    using var sReader = new StreamReader(resourceStream);
-                    var textsText = sReader.ReadToEnd();
-                    jokes = JsonSerializer.Deserialize<List<string>>(textsText);
-
-                    // Now you can use jokes for further processing
-                }
-                else
-                {
-                    Console.WriteLine($"Failed to retrieve the resource: {resourceName}");
-                    return;  // Exit early as we can't proceed without the resource
-                }
+                var jokes = LoadEmbeddedJsonList(resourceName);
 
                 if (jokes != null && jokes.Count > 0)
                 {
@@ -141,6 +123,53 @@ namespace TelegramUI.Commands
 
 
             }
+        public static async Task RandomPaimonPhrase(MessageEventArgs e)
+        {
+            try
+            {
+                var resourceName = $"TelegramUI.Strings.Misc.paimonResponses_{GetLanguage(e.Message)}.json";
+                var assembly = typeof(Wish).Assembly;
+                var responses = LoadEmbeddedJsonList(resourceName);
+
+                if (responses != null && responses.Count > 0)
+                {
+                    var rnd = new Random();
+                    var randomPhrase = responses[rnd.Next(responses.Count)];
+
+                    await Bot.SendTextMessageAsync(
+                        e.Message.Chat.Id,
+                        randomPhrase,
+                        replyToMessageId: e.Message.MessageId);
+                }
+                else
+                {
+                    await Bot.SendTextMessageAsync(
+                        e.Message.Chat.Id,
+                        "Paimon has nothing to say right now.",
+                        replyToMessageId: e.Message.MessageId);
+                }
+            }
+            catch (Exception exception)
+            {
+                // Handle exceptions here
+            }
 
         }
+        public static List<string> LoadEmbeddedJsonList(string resourceKey)
+        {
+            var assembly = typeof(Wish).Assembly;
+            var resourceStream = assembly.GetManifestResourceStream(resourceKey);
+
+            if (resourceStream == null)
+            {
+                Console.WriteLine($"Resource not found: {resourceKey}");
+                return null;
+            }
+
+            using var sReader = new StreamReader(resourceStream);
+            var content = sReader.ReadToEnd();
+            return JsonSerializer.Deserialize<List<string>>(content);
+        }
+
+    }
     }

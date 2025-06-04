@@ -304,6 +304,8 @@ namespace TelegramUI.Commands
 
             return result;
         }
+        
+        // Method for selling item. Enter item id and (neceserraly) amount
         internal static string SellItem(Message message, string itemId, int amount = 1)
         {
             // Default values
@@ -427,6 +429,155 @@ namespace TelegramUI.Commands
                 //ignored
                 return "Damn! Some eror happened while selling item! Please contact the dev and tell him \"Fix Bugs Please!\".";
             }
+        }
+
+        // Get user info
+        internal static string GetUserInfo(Message message, long? targetUserId = null, string targetUsername = null)
+        {
+            // Use target user ID, if provided
+            long userIdToCheck = targetUserId ?? message.From.Id;
+            string usernameToShow = targetUsername ?? message.From.FirstName;
+
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            // Get user's basic stats
+            int totalWishes = 0;
+            int starglitter = 0;
+            int lastFourStarPity = 0;
+            int lastFiveStarPity = 0;
+            bool isEventPity = false;
+            string lastWishTimeFormatted = "N/A";
+
+            using (var cmd = new SQLiteCommand(con))
+            {
+                cmd.Parameters.AddWithValue("@userId", userIdToCheck);
+                cmd.Parameters.AddWithValue("@chatId", message.Chat.Id);
+                cmd.CommandText = @"SELECT TotalWishes, Starglitter, FourPity, FivePity, FiftyLose, LastWishTime 
+                           FROM UsersInChats 
+                           WHERE UserId = @userId AND ChatId = @chatId";
+
+                using (var rdr = cmd.ExecuteReader())
+                {
+                    if (rdr.Read())
+                    {
+                        totalWishes = rdr.GetInt32(0);
+                        starglitter = rdr.GetInt32(1);
+                        lastFourStarPity = rdr.GetInt32(2);
+                        lastFiveStarPity = rdr.GetInt32(3);
+                        isEventPity = rdr.GetBoolean(4);
+
+                        if (!rdr.IsDBNull(5))
+                        {
+                            var lastWishTime = rdr.GetString(5);
+                            var parsedTime = DateTime.ParseExact(lastWishTime, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                            lastWishTimeFormatted = parsedTime.ToString("HH:mm dd.MM.yyyy");
+                        }
+                    }
+                }
+            }
+
+            // Get rank information (assuming RankSystem class exists)
+            var (level, exp, expToNext) = RankSystem.GetUserRankInfo(userIdToCheck, message.Chat.Id);
+            var rankTitle = RankSystem.GetRankTitle(level);
+            var progressBar = RankSystem.GetExpProgressBar(exp, expToNext);
+
+            // Count total items by rarity
+            var itemCounts = new int[3]; // [5-star, 4-star, 3-star]
+            var characterCounts = new int[2]; // [5-star chars, 4-star chars]
+            var weaponCounts = new int[3]; // [5-star weapons, 4-star weapons, 3-star weapons]
+
+            using (var cmd2 = new SQLiteCommand(con))
+            {
+                cmd2.Parameters.AddWithValue("@userId", userIdToCheck);
+                cmd2.Parameters.AddWithValue("@chatId", message.Chat.Id);
+                cmd2.CommandText = "SELECT ItemId, Count FROM InventoryItems WHERE UserId = @userId AND ChatId = @chatId";
+
+                var itemIds = new List<string>();
+                var countIds = new List<int>();
+
+                using (var rdr = cmd2.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        itemIds.Add(rdr.GetString(0));
+                        countIds.Add(rdr.GetInt32(1));
+                    }
+                }
+
+                // Process items to count by rarity and type
+                for (var i = 0; i < itemIds.Count; i++)
+                {
+                    var id = itemIds[i];
+                    var items = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.Items.{GetLanguage(message)}.json");
+                    var sR = new StreamReader(items);
+                    var itemsText = sR.ReadToEnd();
+                    sR.Close();
+
+                    var itemsList = JsonSerializer.Deserialize<List<Items>>(itemsText);
+                    var item = itemsList.Find(x => x.Id.Contains(id));
+
+                    if (item != null)
+                    {
+                        switch (item.Stars)
+                        {
+                            case 5:
+                                itemCounts[0] += countIds[i];
+                                if (item.TypeId == "character") characterCounts[0] += countIds[i];
+                                else if (item.TypeId == "weapon") weaponCounts[0] += countIds[i];
+                                break;
+                            case 4:
+                                itemCounts[1] += countIds[i];
+                                if (item.TypeId == "character") characterCounts[1] += countIds[i];
+                                else if (item.TypeId == "weapon") weaponCounts[1] += countIds[i];
+                                break;
+                            case 3:
+                                itemCounts[2] += countIds[i];
+                                if (item.TypeId == "weapon") weaponCounts[2] += countIds[i];
+                                break;
+                        }
+                    }
+                }
+            }
+
+            con.Close();
+
+            // Get language strings
+            var language = GetLanguage(message);
+            var generalStrings = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.General.{language}.json");
+            var sRGeneral = new StreamReader(generalStrings);
+            var generalText = sRGeneral.ReadToEnd();
+            sRGeneral.Close();
+            var generalList = JsonSerializer.Deserialize<List<string>>(generalText);
+
+            // Format event pity status
+            string eventPity = isEventPity ? "yes" : "no";
+
+            // Build result string
+            var result = $"👤 <b>{HttpUtility.HtmlEncode(usernameToShow)}</b>\n\n";
+
+            // Rank and experience
+            result += $"📊 <b>Rank:</b> Level {level} {rankTitle}\n";
+            result += $"⚡ <b>EXP:</b> {progressBar}\n";
+            result += $"📈 <b>Next level:</b> {expToNext} EXP needed\n\n";
+
+            // Starglitter balance
+            result += $"✨ <b>Starglitter:</b> {starglitter}\n\n";
+
+            // Wish statistics
+            result += $"🎯 <b>Total wishes:</b> {totalWishes}\n";
+            result += $"🎲 <b>4⭐ pity:</b> {lastFourStarPity}/10\n";
+            result += $"🎲 <b>5⭐ pity:</b> {lastFiveStarPity}/90\n";
+            result += $"🎭 <b>Event pity:</b> {eventPity}\n";
+            result += $"🕐 <b>Last wish:</b> {lastWishTimeFormatted}\n\n";
+
+            // Inventory summary
+            result += $"🎒 <b>Inventory summary:</b>\n";
+            result += $"⭐⭐⭐⭐⭐ Items: {itemCounts[0]} ({characterCounts[0]} chars, {weaponCounts[0]} weapons)\n";
+            result += $"⭐⭐⭐⭐ Items: {itemCounts[1]} ({characterCounts[1]} chars, {weaponCounts[1]} weapons)\n";
+            result += $"⭐⭐⭐ Items: {itemCounts[2]} (weapons only)\n";
+
+            return result;
         }
     }
 }
