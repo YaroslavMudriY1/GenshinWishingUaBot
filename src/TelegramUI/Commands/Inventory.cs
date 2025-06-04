@@ -566,8 +566,8 @@ namespace TelegramUI.Commands
 
             // Wish statistics
             result += $"🎯 <b>Total wishes:</b> {totalWishes}\n";
-            result += $"🎲 <b>4⭐ pity:</b> {lastFourStarPity}/10\n";
-            result += $"🎲 <b>5⭐ pity:</b> {lastFiveStarPity}/90\n";
+            result += $"🎲 <b>4⭐ pity:</b> {lastFourStarPity}/7\n";
+            result += $"🎲 <b>5⭐ pity:</b> {lastFiveStarPity}/30\n";
             result += $"🎭 <b>Event pity:</b> {eventPity}\n";
             result += $"🕐 <b>Last wish:</b> {lastWishTimeFormatted}\n\n";
 

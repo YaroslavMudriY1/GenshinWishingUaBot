@@ -30,21 +30,32 @@ namespace TelegramUI.Commands
         /// Add EXP to user based on item star rarity.
         /// </summary>
         /// <param name="userId">user ID</param>
-        /// <param name="chatId">chat ID </param>
-        /// <param name="starRarity">item rarity (3, 4, or 5)</param>
-        /// <returns>Result with level up info/returns>
+        /// <param name="chatId">chat ID</param>
+        /// <param name="starRarity">item rarity (3, 4, or 5) OR total EXP amount</param>
+        /// <returns>Result with level up info</returns>
         public static RankUpResult AddExperience(long userId, long chatId, int starRarity)
         {
             var result = new RankUpResult();
 
-            // How much EXP to add based on star rarity
-            int expToAdd = starRarity switch
+            int expToAdd;
+
+            // Check if this is a direct EXP amount (for wish10) or star rarity (for single wish)
+            // If the value is greater than 5, treat it as direct EXP amount
+            if (starRarity > 5)
             {
-                3 => EXP_3_STAR,
-                4 => EXP_4_STAR,
-                5 => EXP_5_STAR,
-                _ => 0
-            };
+                expToAdd = starRarity; // Direct EXP amount from wish10
+            }
+            else
+            {
+                // Convert star rarity to EXP for single wishes
+                expToAdd = starRarity switch
+                {
+                    3 => EXP_3_STAR,
+                    4 => EXP_4_STAR,
+                    5 => EXP_5_STAR,
+                    _ => 0
+                };
+            }
 
             if (expToAdd == 0) return result;
 
@@ -61,7 +72,7 @@ namespace TelegramUI.Commands
             int newExp = currentExp + expToAdd;
             int newLevel = currentLevel;
 
-            // Check if enough experience to level up
+            // Check if enough experience to level up (may level up multiple times)
             while (true)
             {
                 int expRequired = GetExpRequiredForLevel(newLevel + 1);
@@ -77,7 +88,7 @@ namespace TelegramUI.Commands
                 }
             }
 
-            // Update date in DB
+            // Update data in DB
             UpdateUserRank(con, userId, chatId, newLevel, newExp);
 
             // If leveled up, give reward
@@ -94,6 +105,19 @@ namespace TelegramUI.Commands
             con.Close();
             return result;
         }
+
+        /// <summary>
+        /// Overloaded method specifically for adding direct EXP amount (for wish10)
+        /// </summary>
+        /// <param name="userId">user ID</param>
+        /// <param name="chatId">chat ID</param>
+        /// <param name="expAmount">direct EXP amount to add</param>
+        /// <returns>Result with level up info</returns>
+        public static RankUpResult AddExperienceDirect(long userId, long chatId, int expAmount)
+        {
+            return AddExperience(userId, chatId, expAmount);
+        }
+
 
         // Get user rank info from DB
         public static (int level, int exp, int expToNext) GetUserRankInfo(long userId, long chatId)
@@ -180,17 +204,17 @@ namespace TelegramUI.Commands
             {
                 if (level % 10 == 0) // Every 10th level
                 {
-                    starglitterReward += 50;
+                    starglitterReward += 100 * (level/10);
                     additionalReward += $"🎊 Milestone Level {level}! ";
                 }
                 else if (level % 5 == 0) // Every 5th level
                 {
-                    starglitterReward += 25;
+                    starglitterReward += 50 * (level/5);
                     additionalReward += $"⭐ Level {level} bonus! ";
                 }
                 else
                 {
-                    starglitterReward += 5 + (level / 10) * 2; // Base reward + bonus for high level
+                    starglitterReward += 10 + (level / 10) * 2; // Base reward + bonus for high level
                 }
             }
 

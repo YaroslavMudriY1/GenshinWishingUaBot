@@ -211,7 +211,7 @@ namespace TelegramUI.Commands
             // Get trade key (all after "t_a_" or "t_d_")
             string tradeKey = string.Join("_", parts, 2, parts.Length - 2);
 
-            Console.WriteLine($"Action: {action}, TradeKey: {tradeKey}"); // For debug
+            //Console.WriteLine($"Action: {action}, TradeKey: {tradeKey}"); // For debug
 
             // Check if trade exist by key
             if (!ActiveTrades.ContainsKey(tradeKey))

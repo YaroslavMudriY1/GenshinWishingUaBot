@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: MPL-2.0
 
 using System;
 using System.Collections.Generic;
@@ -61,7 +61,7 @@ namespace TelegramUI.Commands
         internal static string[] GetCharacterPull(Message message, bool oneWish)
         {
 
-            var result = new string[2];     //If one wish return wish description and htlm.preview of image
+            var result = new string[3];     //If one wish return wish description, htlm.preview of image and item rarity
             var result10 = new string[4];   //If 10 wishes return name, stars, type, starglitter
             var type = RandomizerType();    // Select type (character or weapon)
 
@@ -233,6 +233,28 @@ namespace TelegramUI.Commands
                 cmd3.ExecuteNonQuery();
             }
 
+            // EXP calculation
+            //var rankResult = RankSystem.AddExperience(message.From.Id, message.Chat.Id, wish.Stars);
+
+/*            if (wish.Stars == 5)
+            {
+                 = 10;
+            }
+            else if (wish.Stars == 4)
+            {
+                expReward = 3;
+            }
+            else if (wish.Stars == 3)
+            {
+                expReward = 1;
+            }
+
+            if (expReward > 0)
+            {
+                cmd3.CommandText = "UPDATE UserRanks SET Experience = Experience + @exp WHERE UserId = @user AND ChatId = @chat";
+                cmd3.Parameters.Add(new SQLiteParameter("@exp", expReward));
+                cmd3.ExecuteNonQuery();
+            }*/
 
             con.Close();
             
@@ -244,6 +266,7 @@ namespace TelegramUI.Commands
             
             //Output result as message
             result[0] = string.Format(textsList[0], wish.Description, HttpUtility.HtmlEncode(message.From.FirstName), wish.Name, wish.Title, wish.Stars, wish.Type, wish.TypeDesc, wish.Region, starglitterReward);
+            result[2] = wish.Stars.ToString();
             
             result10[0] = wish.Name;
             result10[1] = wish.Stars.ToString();
@@ -559,7 +582,7 @@ namespace TelegramUI.Commands
                 var characters = starGroup.Value.Where(p => p[2] == "character").Select(p => p[0]).ToList();
                 var weapons = starGroup.Value.Where(p => p[2] == "weapon").Select(p => p[0]).ToList();
 
-                result.AppendLine($"{starEmoji} ({count})");
+                result.AppendLine($"{starEmoji}({count})");
                 if (characters.Count > 0)
                     result.AppendLine($"Characters: {string.Join(", ", characters)}");
                 if (weapons.Count > 0)
@@ -569,41 +592,6 @@ namespace TelegramUI.Commands
 
             return result.ToString().Trim();
         }
-
-        // Get Rarity (stars) from pull result. Use for EXP calculation
-        public static int ExtractRarityFromOnePull(string[] pullResult)
-        {
-            //pullResult[0] is the first element of the array, which contains the pull description, including the rarity
-            string pullText = pullResult[0];
-
-            if (pullText.Contains("5⭐️"))
-                return 5;
-            else if (pullText.Contains("4⭐️"))
-                return 4;
-            else if (pullText.Contains("3⭐️"))
-                return 3;
-
-            // Default case if no rarity is found
-            return 3;
-        }
-
-        // Get Rarity (stars) from 10-pull result. Use for EXP calculation
-        public static int ExtractRarityFromTenPull(string[] pullResult)
-        {
-            //pullResult[0] is the first element of the array, which contains the pull description, including the rarity
-            string pullText = pullResult[0];
-
-            if (pullText.Contains("⭐⭐⭐⭐⭐") || pullText.Contains("5⭐️"))
-                return 5;
-            else if (pullText.Contains("⭐⭐⭐⭐") || pullText.Contains("4⭐️"))
-                return 4;
-            else if (pullText.Contains("⭐⭐⭐") || pullText.Contains("3⭐️"))
-                return 3;
-
-            // Deafult case if no rarity is found
-            return 3;
-        }
-
 
     }
 }

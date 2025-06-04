@@ -145,8 +145,7 @@ namespace TelegramUI.Telegram
                         if (Wish.HasRolled(e.Message) == 1) // Check if user already rolled
                         {
                             int userBalance = Wish.GetStarglitter(userId, chatId);
-                            //Get last wish time info
-                            DateTime lastWish;
+                            DateTime lastWish;  //Get last wish time info
                             int hourDiff, minuteDiff;
 
                             using var con0 = new SQLiteConnection(MainDb());
@@ -238,9 +237,9 @@ namespace TelegramUI.Telegram
                         Wish.SetWishTime(userId, chatId);
 
                         var onePull = Wish.GetCharacterPull(e.Message,true);  // Wish output message      
-                        int starRarity = Wish.ExtractRarityFromOnePull(onePull); //Get wish.Stars from ouput message
+                        //int starRarity = Wish.ExtractRarityFromOnePull(onePull); //Get wish.Stars from ouput message
 
-                        var rankResult = RankSystem.AddExperience(userId, chatId, starRarity);
+                        var rankResult = RankSystem.AddExperience(userId, chatId, Convert.ToInt32(onePull[2]));
 
                         while (true)
                         {
@@ -285,43 +284,54 @@ namespace TelegramUI.Telegram
                         }
                         break;
 
-
-                    case "/wish10"or "/w10" or "/десятка":
+                    case "/wish10" or "/w10" or "/десятка":
                         var userId10 = e.Message.From.Id;
                         var chatId10 = e.Message.Chat.Id;
                         int balance = Wish.GetStarglitter(userId10, chatId10);
 
-                        if (balance>= 100) // Check Starglitter balance
+                        if (balance >= 100) // Check Starglitter balance
                         {
-                            Wish.UseStarglitter(userId10,chatId10, 100); // Substract 100 Starglitter
+                            Wish.UseStarglitter(userId10, chatId10, 100); // Subtract 100 Starglitter
 
                             List<string[]> pulls = new List<string[]>();
-                            int totalExpGained = 0;
-                            bool leveledUp = false;
-                            RankSystem.RankUpResult finalRankResult = new RankSystem.RankUpResult();
-
+                            int totalExp = 0;
+                            // Generate 10 pulls and accumulate EXP
                             for (int i = 0; i < 10; i++)
                             {
                                 var pull = Wish.GetCharacterPull(e.Message, false);
                                 pulls.Add(pull);
+                                int rarity = Convert.ToInt32(pull[1]);
+                                int expForThisPull = rarity switch
+                                {
+                                    3 => 1,
+                                    4 => 3,
+                                    5 => 10,
+                                    _ => 1
+                                };
+                                totalExp += expForThisPull;
+                            }
 
-                                // Gain experience based on the rarity of every pull
-                                int starRarity10 = Wish.ExtractRarityFromTenPull(pull);
-                                var rankResult10 = RankSystem.AddExperience(userId10, chatId10, starRarity10);
+                            // Get wish10 summary
+                            string getWish10Sum = Wish.GetWish10Summary(pulls);
 
+                            // Add EXP to user after all pulls
+                            bool leveledUp = false;
+                            RankSystem.RankUpResult finalRankResult = new RankSystem.RankUpResult();
+                            if (totalExp > 0)
+                            {
+                                var rankResult10 = RankSystem.AddExperience(userId10, chatId10, totalExp);
                                 if (rankResult10.LeveledUp)
                                 {
                                     leveledUp = true;
-                                    finalRankResult = rankResult10; // Save the final rank result
+                                    finalRankResult = rankResult10;
                                 }
                             }
-                            string getWish10Sum = Wish.GetWish10Summary(pulls);
 
-                            int newBalance10 = Wish.GetStarglitter(userId10,chatId10); // Get new balance. Wishes may add starglitter as cashback
+                            int newBalance10 = Wish.GetStarglitter(userId10, chatId10); // Get new balance. Wishes may add starglitter as cashback
 
                             string resultMessage = string.Format(textsList[7], newBalance10, getWish10Sum);
-                            
-                            //If wish availiable, update wish time
+
+                            // If wish available, update wish time
                             Wish.SetWishTime(userId10, chatId10);
 
                             try
@@ -361,14 +371,14 @@ namespace TelegramUI.Telegram
                                     // ignored
                                 }
                             }
-                            }
+                        }
                         else
                         {
                             try
                             {
                                 await Bot.SendTextMessageAsync(
                                     e.Message.Chat.Id,
-                                    string.Format(textsList[8],balance), // Message about insufficient Starglitter
+                                    string.Format(textsList[8], balance), // Message about insufficient Starglitter
                                     replyToMessageId: e.Message.MessageId);
                             }
                             catch (Exception exception)
@@ -377,7 +387,7 @@ namespace TelegramUI.Telegram
                             }
                         }
                         break;
-
+                
                     // If user wants to check their rank
                     case "/rank" or "/myRank" or "/r" or "/level" or "/myLevel" or "/lvl":
                         var userIdRank = e.Message.From.Id;
