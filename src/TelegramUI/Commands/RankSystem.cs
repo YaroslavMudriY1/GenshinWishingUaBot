@@ -35,28 +35,32 @@ namespace TelegramUI.Commands
         /// <returns>Result with level up info</returns>
         public static RankUpResult AddExperience(long userId, long chatId, int starRarity)
         {
+
+            int expToAdd = starRarity switch
+            {
+                3 => EXP_3_STAR,
+                4 => EXP_4_STAR,
+                5 => EXP_5_STAR,
+                _ => 0
+            };
+            return AddExperienceInternal(userId, chatId, expToAdd);
+        }
+    
+        /// <summary>
+        /// Overloaded method specifically for adding direct EXP amount (for wish10)
+        /// </summary>
+        /// <param name="userId">user ID</param>
+        /// <param name="chatId">chat ID</param>
+        /// <param name="expAmount">direct EXP amount to add</param>
+        /// <returns>Result with level up info</returns>
+        public static RankUpResult AddExperienceDirect(long userId, long chatId, int expAmount)
+        {
+            return AddExperienceInternal(userId, chatId, expAmount);
+        }
+
+        private static RankUpResult AddExperienceInternal(long userId, long chatId, int expToAdd)
+        { 
             var result = new RankUpResult();
-
-            int expToAdd;
-
-            // Check if this is a direct EXP amount (for wish10) or star rarity (for single wish)
-            // If the value is greater than 5, treat it as direct EXP amount
-            if (starRarity > 5)
-            {
-                expToAdd = starRarity; // Direct EXP amount from wish10
-            }
-            else
-            {
-                // Convert star rarity to EXP for single wishes
-                expToAdd = starRarity switch
-                {
-                    3 => EXP_3_STAR,
-                    4 => EXP_4_STAR,
-                    5 => EXP_5_STAR,
-                    _ => 0
-                };
-            }
-
             if (expToAdd == 0) return result;
 
             using var con = new SQLiteConnection(MainDb());
@@ -105,19 +109,6 @@ namespace TelegramUI.Commands
             con.Close();
             return result;
         }
-
-        /// <summary>
-        /// Overloaded method specifically for adding direct EXP amount (for wish10)
-        /// </summary>
-        /// <param name="userId">user ID</param>
-        /// <param name="chatId">chat ID</param>
-        /// <param name="expAmount">direct EXP amount to add</param>
-        /// <returns>Result with level up info</returns>
-        public static RankUpResult AddExperienceDirect(long userId, long chatId, int expAmount)
-        {
-            return AddExperience(userId, chatId, expAmount);
-        }
-
 
         // Get user rank info from DB
         public static (int level, int exp, int expToNext) GetUserRankInfo(long userId, long chatId)

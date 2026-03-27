@@ -364,7 +364,7 @@ namespace TelegramUI.Telegram
                             RankSystem.RankUpResult finalRankResult = new RankSystem.RankUpResult();
                             if (totalExp > 0)
                             {
-                                var rankResult10 = RankSystem.AddExperience(userId10, chatId10, totalExp);
+                                var rankResult10 = RankSystem.AddExperienceDirect(userId10, chatId10, totalExp);
                                 if (rankResult10.LeveledUp)
                                 {
                                     leveledUp = true;
