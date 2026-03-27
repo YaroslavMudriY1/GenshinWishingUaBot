@@ -66,7 +66,6 @@ namespace TelegramUI.Commands
                 }
             }
 
-
             var items = typeof(Wish).Assembly.GetManifestResourceStream(
                 $"TelegramUI.Strings.Items.{GetLanguage(message)}.json");
             var sR = new StreamReader(items);
@@ -78,7 +77,7 @@ namespace TelegramUI.Commands
             {
 
                 var id = itemIds[i];
-                var item = itemsList.Find(x => x.Id.Contains(id));
+                var item = itemsList.Find(x => x.Id == id);
 
                 switch (item.Stars)
                 {
@@ -655,17 +654,15 @@ namespace TelegramUI.Commands
                     }
                 }
 
+                var itemStream = typeof(Wish).Assembly
+                    .GetManifestResourceStream($"TelegramUI.Strings.Items.{GetLanguage(message)}.json");
+                var allItems = JsonSerializer.Deserialize<List<Items>>(new StreamReader(itemStream).ReadToEnd());
+                
                 // Process items to count by rarity and type
                 for (var i = 0; i < itemIds.Count; i++)
                 {
                     var id = itemIds[i];
-                    var items = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.Items.{GetLanguage(message)}.json");
-                    var sR = new StreamReader(items);
-                    var itemsText = sR.ReadToEnd();
-                    sR.Close();
-
-                    var itemsList = JsonSerializer.Deserialize<List<Items>>(itemsText);
-                    var item = itemsList.Find(x => x.Id.Contains(id));
+                    var item = allItems.Find(x => x.Id == id);
 
                     if (item != null)
                     {
