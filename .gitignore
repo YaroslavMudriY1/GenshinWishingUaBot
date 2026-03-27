@@ -13,3 +13,4 @@ x64/
 # Dev-related
 
 appsettings.local.json
+appsettings.json

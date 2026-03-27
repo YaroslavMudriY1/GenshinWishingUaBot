@@ -603,67 +603,14 @@ namespace TelegramUI.Telegram
                         }
 
                         var tradeResult = await Trade.InitiateTrade(e.Message);
-
+                        
                         if (tradeResult.Success)
                         {
-                            var offerParts = e.Message.Text.Split(' ');
-                            var offerQuantity = 1;
-                            string offerItemId, requestItemId;
-                            var requestQuantity = 1;
-
-                            if (offerParts.Length >= 3)
-                            {
-                                if (int.TryParse(offerParts[1], out int qty))
-                                {
-                                    offerQuantity = qty;
-                                    offerItemId = offerParts[2];
-                                }
-                                else
-                                {
-                                    offerItemId = offerParts[1];
-                                }
-
-                                if (offerParts.Length >= 4)
-                                {
-                                    if (int.TryParse(offerParts[offerParts.Length - 2], out int reqQty))
-                                    {
-                                        requestQuantity = reqQty;
-                                        requestItemId = offerParts[offerParts.Length - 1];
-                                    }
-                                    else
-                                    {
-                                        requestItemId = offerParts[offerParts.Length - 1];
-                                    }
-                                }
-                                else
-                                {
-                                    requestItemId = offerParts[offerParts.Length - 1];
-                                }
-
-                                var offerItem = Language.GetItemName(offerItemId, GetLanguage(e.Message));
-                                var requestItem = Language.GetItemName(requestItemId, GetLanguage(e.Message));
-
-                                var userIdFrom = e.Message.From.Id;
-                                var userIdTo = e.Message.ReplyToMessage.From.Id;
-                                var chatIdTrade = e.Message.Chat.Id;
-
-                                // Unused keyboard
-                                // var confirmTradeButton = InlineKeyboardButton.WithCallbackData(
-                                //     "✅ Accept trade",
-                                //     $"confirm_trade:{userIdFrom}:{userIdTo}:{offerItemId}:{offerQuantity}:{requestItemId}:{requestQuantity}"
-                                // );
-                                //
-                                // var cancelTradeButton = InlineKeyboardButton.WithCallbackData(
-                                //     "❌ Decline",
-                                //     $"cancel_trade:{userIdTo}:{userIdFrom}"
-                                // );
-                                //
-                                // var tradeKeyboard = new InlineKeyboardMarkup(new[]
-                                // {
-                                //     new[] { confirmTradeButton },
-                                //     new[] { cancelTradeButton }
-                                // });
-
+                                var offerItem = tradeResult.OfferItemName;
+                                var offerQuantity = tradeResult.OfferItemQuantity;
+                                var requestItem = tradeResult.RequestItemName;
+                                var requestQuantity = tradeResult.RequestItemQuantity;
+                                
                                 var tradeMessage = await Bot.SendTextMessageAsync(
                                     e.Message.Chat.Id,
                                     $"{HttpUtility.HtmlEncode(e.Message.From.FirstName)} offers {offerQuantity}x " +
@@ -679,7 +626,7 @@ namespace TelegramUI.Telegram
                                     tradeMessage.MessageId,
                                     e.Message.From.FirstName,
                                     e.Message.ReplyToMessage.From.FirstName);
-                            }
+                            
                         }
                         else
                         {

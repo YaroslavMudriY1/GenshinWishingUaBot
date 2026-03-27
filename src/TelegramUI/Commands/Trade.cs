@@ -45,6 +45,12 @@ namespace TelegramUI.Commands
             public string ErrorMessage { get; set; }
             public InlineKeyboardMarkup ReplyMarkup { get; set; }
             public string TradeKey { get; set; } // Додано для простоти передачі ключа
+            // Offered and Requested items names
+            public string OfferItemName { get; set; }
+            public string RequestItemName { get; set; }
+            // Offered and Requested items quantity
+            public int OfferItemQuantity { get; set; }
+            public int RequestItemQuantity { get; set; }
         }
 
         internal static async Task<TradeInitiationResult> InitiateTrade(Message message)
@@ -78,8 +84,6 @@ namespace TelegramUI.Commands
             
             int offerQuantity = 1;  // Default quantity
             int requestQuantity = 1;
-            string offerQuery;
-            string requestQuery;
             
             // Try to get first quantity
             var tokens = rawInput.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -139,43 +143,6 @@ namespace TelegramUI.Commands
             string requestItemId = requestResult.Value.id;
             string offerItemId = bestOfferId;
             
-            
-            //  Old Parcing options
-            // if (parts.Length == 3)
-            // {
-            //     // Format: /trade [itemId1] [itemId2]
-            //     offerItemId = parts[1].ToLower();
-            //     requestItemId = parts[2].ToLower();
-            // }
-            // else if (parts.Length == 4)
-            // {
-            //     // Format: /trade [quantity1] [itemId1] [itemId2]
-            //     if (!int.TryParse(parts[1], out offerQuantity) || offerQuantity <= 0)
-            //     {
-            //         result.ErrorMessage = "Invalid offer quantity.";
-            //         return result;
-            //     }
-            //     offerItemId = parts[2].ToLower();
-            //     requestItemId = parts[3].ToLower();
-            // }
-            // else
-            // {
-            //     // Format: /trade [quantity1] [itemId1] [quantity2] [itemId2]
-            //     if (!int.TryParse(parts[1], out offerQuantity) || offerQuantity <= 0)
-            //     {
-            //         result.ErrorMessage = "Invalid offer quantity.";
-            //         return result;
-            //     }
-            //     offerItemId = parts[2].ToLower();
-            //
-            //     if (!int.TryParse(parts[3], out requestQuantity) || requestQuantity <= 0)
-            //     {
-            //         result.ErrorMessage = "Invalid request quantity.";
-            //         return result;
-            //     }
-            //     requestItemId = parts[4].ToLower();
-            // }
-
             // Check if items exists
             if (!ItemExists(offerItemId) || !ItemExists(requestItemId))
             {
@@ -208,6 +175,11 @@ namespace TelegramUI.Commands
                 return result;
             }
 
+            result.OfferItemName = bestOfferName;
+            result.OfferItemQuantity = offerQuantity;
+            result.RequestItemName = requestResult.Value.name;
+            result.RequestItemQuantity = requestQuantity;
+            
             // Create unique authenticator key
             string guid = Guid.NewGuid().ToString("N").Substring(0, 8); // Short authenticator (8 символів)
             string tradeKey = $"{initiatorId}_{targetId}_{guid}";
@@ -244,22 +216,23 @@ namespace TelegramUI.Commands
         }
 
         // Method for update MessageId and start timer
-        internal static async Task UpdateMessageIdAndStartTimer(string tradeKey, int messageId, string initiatorName, string targetName)
+        internal static async Task UpdateMessageIdAndStartTimer(
+            string tradeKey, int messageId, string initiatorName, string targetName)
         {
             if (ActiveTrades.ContainsKey(tradeKey))
             {
-                // Update MessageId
                 var trade = ActiveTrades[tradeKey];
                 trade.MessageId = messageId;
                 ActiveTrades[tradeKey] = trade;
 
-                // Start timer
-                _ = StartTradeTimeoutAsync(trade.ChatId, messageId, initiatorName, targetName);
+                // Sending tradeKey so timer can check trade status
+                _ = StartTradeTimeoutAsync(tradeKey, trade.ChatId, messageId, initiatorName, targetName);
             }
         }
 
         // Trade handler (accept or deny)
-        internal static bool HandleTradeResponse(string callbackData, long userId, out string message, out bool isAccepted)
+        internal static bool HandleTradeResponse(string callbackData, long userId, out string message,
+            out bool isAccepted)
         {
             message = string.Empty;
             isAccepted = false;
@@ -289,7 +262,7 @@ namespace TelegramUI.Commands
             var trade = ActiveTrades[tradeKey];
 
             // Check if user have right to answer on offer
-            if (trade.TargetId != userId)
+            if (userId != trade.TargetId && userId != trade.InitiatorId)
             {
                 message = "This trade offer is not for you.";
                 return false;
@@ -297,12 +270,22 @@ namespace TelegramUI.Commands
 
             if (action == "d") // Decline
             {
-                ActiveTrades.TryRemove(tradeKey, out _);     
-                message = "You declined the trade.";
+                ActiveTrades.TryRemove(tradeKey, out _);
+                
+                if (userId == trade.InitiatorId)
+                    message = "You cancelled your trade offer.";
+                else
+                    message = "You declined the trade.";
+                
                 return true;
             }
             else if (action == "a") // Accept
             {
+                if (userId != trade.TargetId)
+                {
+                    message = "Only the target user can accept this trade.";
+                    return false;
+                }
                 // Check if have all needed items
                 if (!HasItem(trade.InitiatorId, trade.ChatId, trade.OfferItemId, trade.OfferQuantity))
                 {
@@ -469,29 +452,35 @@ namespace TelegramUI.Commands
             return item?.TypeId ?? "weapon";
         }
 
-        public static async Task StartTradeTimeoutAsync(long chatId, int messageId, string userFromName, string userToName)
+        public static async Task StartTradeTimeoutAsync(
+            string tradeKey, long chatId, int messageId, string userFromName, string userToName)
         {
             // Wait 15 minutes (trade active)
             await Task.Delay(TimeSpan.FromMinutes(15));
+            
+            // If trade ended (accept/decline) — ActiveTrades don't have key. End timer
+            if (!ActiveTrades.ContainsKey(tradeKey))
+                return;
+
+            // Trade still active - time up, edit message
+            ActiveTrades.TryRemove(tradeKey, out _);
 
             try
             {
-                // Update message after
+                // Edit message
                 await Bot.EditMessageTextAsync(
-                    chatId,
-                    messageId,
-                    $"⏱ Times up!. Offer beetween {HttpUtility.HtmlEncode(userFromName)} and {HttpUtility.HtmlEncode(userToName)} expired!.",
+                    chatId, messageId,
+                    $"⏱ Time's up! Offer between " +
+                    $"<b>{HttpUtility.HtmlEncode(userFromName)}</b> and " +
+                    $"<b>{HttpUtility.HtmlEncode(userToName)}</b> has expired.",
                     parseMode: ParseMode.Html);
-
-                // Delete inline buttons
-                await Bot.EditMessageReplyMarkupAsync(
-                    chatId,
-                    messageId,
-                    replyMarkup: null);
+                
+                // Delete buttons
+                await Bot.EditMessageReplyMarkupAsync(chatId, messageId, replyMarkup: null);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in trade timeout: {ex.Message}");
+                Console.WriteLine($"Trade timeout error: {ex.Message}");
             }
         }
     }

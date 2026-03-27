@@ -401,26 +401,57 @@ namespace TelegramUI.Commands
         {
             var stream = typeof(Wish).Assembly
                 .GetManifestResourceStream($"TelegramUI.Strings.Items.{language}.json");
-            var itemsList = JsonSerializer.Deserialize<List<Items>>(new StreamReader(stream).ReadToEnd());
+            if (stream == null) return null;
+            
+            var defStream = typeof(Wish).Assembly
+                .GetManifestResourceStream($"TelegramUI.Strings.Items.en.json");
+            if (defStream == null) return null;
+
+            bool checkedEnglishList = false;
+            
+            var itemsList = JsonSerializer.Deserialize<List<Items>>(
+                new StreamReader(stream).ReadToEnd());
 
             query = query.Trim().ToLower();
+            
+            while (true)
+            {
+                // 1. Exact match by ID
+                var byId = itemsList.Find(x => x.Id.ToLower() == query);
+                if (byId != null) return (byId.Id, byId.Name, 1);
 
-            // 1. Exact match by ID
-            var byId = itemsList.Find(x => x.Id.ToLower() == query);
-            if (byId != null) return (byId.Id, byId.Name, 1);
+                // 2. Exact match by title
+                var byName = itemsList.Find(x => x.Name.ToLower() == query);
+                if (byName != null) return (byName.Id, byName.Name, 1);
 
-            // 2. Exact match by title
-            var byName = itemsList.Find(x => x.Name.ToLower() == query);
-            if (byName != null) return (byName.Id, byName.Name, 1);
+                // 3. Partial match — check all matches
+                var partialName = itemsList
+                    .Where(x => x.Name.ToLower().Contains(query))
+                    .ToList();
+                if (partialName.Count == 1)
+                    return (partialName[0].Id, partialName[0].Name, 1);
+                if (partialName.Count > 1)
+                    return (null, string.Join(", ", partialName.Take(5).Select(x => x.Name)), partialName.Count);
 
-            // 3. Partial match — check all matches
-            var partial = itemsList
-                .Where(x => x.Name.ToLower().Contains(query))
-                .ToList();
+                // 4. Partial match by ID ("dilu" → "diluc")
+                var partialId = itemsList
+                    .Where(x => x.Id.ToLower().Contains(query))
+                    .ToList();
+                if (partialId.Count == 1)
+                    return (partialId[0].Id, partialId[0].Name, 1);
+                if (partialId.Count > 1)
+                    return (null, string.Join(", ", partialId.Take(5).Select(x => x.Name)), partialId.Count);
 
-            if (partial.Count == 1) return (partial[0].Id, partial[0].Name, 1);
-            if (partial.Count > 1)  return (null, string.Join(", ", partial.Take(5).Select(x => x.Name)), partial.Count);
-
+                if (!checkedEnglishList)
+                {
+                    checkedEnglishList = true;
+                    defStream.Position = 0;
+                    itemsList = JsonSerializer.Deserialize<List<Items>>(
+                        new StreamReader(defStream).ReadToEnd());
+                }
+                else break;
+            } 
+            
             return null;
         }
         
