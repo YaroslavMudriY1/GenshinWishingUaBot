@@ -1,18 +1,20 @@
 ﻿// SPDX-License-Identifier: MPL-2.0
 
 using System;
-using System.Collections.Generic;
-using System.Data.SQLite;
 using System.IO;
 using System.Text.Json;
+using System.Data.SQLite;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Web;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
+using Telegram.Bot.Types.Enums;
 using TelegramUI.Strings.Items;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
-using System.Threading.Tasks;
-using System.Web;
-using Telegram.Bot.Types.Enums;
 
 namespace TelegramUI.Commands
 {
@@ -33,7 +35,8 @@ namespace TelegramUI.Commands
         }
 
         // Saves current trades
-        private static readonly Dictionary<string, TradeOffer> ActiveTrades = new Dictionary<string, TradeOffer>();
+        private static readonly ConcurrentDictionary<string, TradeOffer> ActiveTrades = 
+            new ConcurrentDictionary<string, TradeOffer>();
 
         // Class that returns result of InitiateTrade
         internal class TradeInitiationResult
@@ -68,47 +71,110 @@ namespace TelegramUI.Commands
                 result.ErrorMessage = "Invalid format. Use: /trade [quantity1] [itemId1] [quantity2] [itemId2]";
                 return result;
             }
-
+            
+            string language = GetLanguage(message);
+            // Gather all after /trade in one string and trim by digits and words
+            var rawInput = message.Text.Substring(parts[0].Length).Trim();
+            
             int offerQuantity = 1;  // Default quantity
-            string offerItemId;
             int requestQuantity = 1;
-            string requestItemId;
+            string offerQuery;
+            string requestQuery;
+            
+            // Try to get first quantity
+            var tokens = rawInput.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+            int tokenIndex = 0;
 
-            // Parcing options
-            if (parts.Length == 3)
+            if (int.TryParse(tokens[0], out int parsedOffer))
             {
-                // Format: /trade [itemId1] [itemId2]
-                offerItemId = parts[1].ToLower();
-                requestItemId = parts[2].ToLower();
+                offerQuantity = parsedOffer;
+                tokenIndex = 1;
             }
-            else if (parts.Length == 4)
-            {
-                // Format: /trade [quantity1] [itemId1] [itemId2]
-                if (!int.TryParse(parts[1], out offerQuantity) || offerQuantity <= 0)
-                {
-                    result.ErrorMessage = "Invalid offer quantity.";
-                    return result;
-                }
-                offerItemId = parts[2].ToLower();
-                requestItemId = parts[3].ToLower();
-            }
-            else
-            {
-                // Format: /trade [quantity1] [itemId1] [quantity2] [itemId2]
-                if (!int.TryParse(parts[1], out offerQuantity) || offerQuantity <= 0)
-                {
-                    result.ErrorMessage = "Invalid offer quantity.";
-                    return result;
-                }
-                offerItemId = parts[2].ToLower();
+            
+            // Find where ending offerQuery - by digit or existing item
+            // Strategy: try gradually add more tokens for offer
+            string bestOfferId = null, bestOfferName = null;
+            int splitPoint = -1;
 
-                if (!int.TryParse(parts[3], out requestQuantity) || requestQuantity <= 0)
+            for (int end = tokenIndex + 1; end <= tokens.Count; end++)
+            {
+                string candidate = string.Join(" ", tokens.GetRange(tokenIndex, end - tokenIndex));
+                var query = Inventory.FindItemByQuery(candidate, language);
+                if (query.HasValue && query.Value.found == 1)
                 {
-                    result.ErrorMessage = "Invalid request quantity.";
-                    return result;
+                    bestOfferId = query.Value.id;
+                    bestOfferName = query.Value.name;
+                    splitPoint = end;
                 }
-                requestItemId = parts[4].ToLower();
             }
+            
+            if (bestOfferId == null)
+            {
+                result.ErrorMessage = "❌ Could not find the first item. Try `/get_id` or use the exact name.";
+                return result;
+            }
+            
+            // After splitPoint - quantity and second item
+            int remainder = tokenIndex;
+            remainder = splitPoint;
+
+            if (remainder < tokens.Count && int.TryParse(tokens[remainder], out int parsedReq))
+            {
+                requestQuantity = parsedReq;
+                remainder++;
+            }
+
+            string requestCandidate = string.Join(" ", tokens.GetRange(remainder, tokens.Count - remainder));
+            var requestResult = Inventory.FindItemByQuery(requestCandidate, language);
+
+            if (!requestResult.HasValue || requestResult.Value.found != 1)
+            {
+                string hint = requestResult.HasValue
+                    ? $"Did you mean: {requestResult.Value.name}?"
+                    : "Item not found.";
+                result.ErrorMessage = $"❌ Could not identify the second item. {hint}";
+                return result;
+            }
+            
+            string requestItemId = requestResult.Value.id;
+            string offerItemId = bestOfferId;
+            
+            
+            //  Old Parcing options
+            // if (parts.Length == 3)
+            // {
+            //     // Format: /trade [itemId1] [itemId2]
+            //     offerItemId = parts[1].ToLower();
+            //     requestItemId = parts[2].ToLower();
+            // }
+            // else if (parts.Length == 4)
+            // {
+            //     // Format: /trade [quantity1] [itemId1] [itemId2]
+            //     if (!int.TryParse(parts[1], out offerQuantity) || offerQuantity <= 0)
+            //     {
+            //         result.ErrorMessage = "Invalid offer quantity.";
+            //         return result;
+            //     }
+            //     offerItemId = parts[2].ToLower();
+            //     requestItemId = parts[3].ToLower();
+            // }
+            // else
+            // {
+            //     // Format: /trade [quantity1] [itemId1] [quantity2] [itemId2]
+            //     if (!int.TryParse(parts[1], out offerQuantity) || offerQuantity <= 0)
+            //     {
+            //         result.ErrorMessage = "Invalid offer quantity.";
+            //         return result;
+            //     }
+            //     offerItemId = parts[2].ToLower();
+            //
+            //     if (!int.TryParse(parts[3], out requestQuantity) || requestQuantity <= 0)
+            //     {
+            //         result.ErrorMessage = "Invalid request quantity.";
+            //         return result;
+            //     }
+            //     requestItemId = parts[4].ToLower();
+            // }
 
             // Check if items exists
             if (!ItemExists(offerItemId) || !ItemExists(requestItemId))
@@ -161,7 +227,7 @@ namespace TelegramUI.Commands
                 // MessageId will be set later
             };
 
-            ActiveTrades[tradeKey] = tradeOffer;
+            ActiveTrades.TryAdd(tradeKey, tradeOffer); 
 
             // Create inline buttons
             result.ReplyMarkup = new InlineKeyboardMarkup(new[]
@@ -231,7 +297,7 @@ namespace TelegramUI.Commands
 
             if (action == "d") // Decline
             {
-                ActiveTrades.Remove(tradeKey);
+                ActiveTrades.TryRemove(tradeKey, out _);     
                 message = "You declined the trade.";
                 return true;
             }
@@ -240,14 +306,14 @@ namespace TelegramUI.Commands
                 // Check if have all needed items
                 if (!HasItem(trade.InitiatorId, trade.ChatId, trade.OfferItemId, trade.OfferQuantity))
                 {
-                    ActiveTrades.Remove(tradeKey);
+                    ActiveTrades.TryRemove(tradeKey, out _);     
                     message = "The trade initiator no longer has the offered item.";
                     return false;
                 }
 
                 if (!HasItem(trade.TargetId, trade.ChatId, trade.RequestItemId, trade.RequestQuantity))
                 {
-                    ActiveTrades.Remove(tradeKey);
+                    ActiveTrades.TryRemove(tradeKey, out _);     
                     message = "You no longer have the requested item.";
                     return false;
                 }
@@ -256,13 +322,13 @@ namespace TelegramUI.Commands
                 if (ExecuteTrade(trade))
                 {
                     isAccepted = true;
-                    ActiveTrades.Remove(tradeKey);
+                    ActiveTrades.TryRemove(tradeKey, out _);     
                     message = "Trade successful!";
                     return true;
                 }
                 else
                 {
-                    ActiveTrades.Remove(tradeKey);
+                    ActiveTrades.TryRemove(tradeKey, out _);     
                     message = "There was an error executing the trade.";
                     return false;
                 }

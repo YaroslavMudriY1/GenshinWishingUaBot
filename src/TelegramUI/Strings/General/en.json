@@ -25,6 +25,6 @@
   "Use <code>/inv</code> to view your current inventory. Items are organized by rarity (5★, 4★, 3★) and show the quantity of each item you own.",
   "To find an item's ID, use the command <code>/get_id &lt;item_name&gt;</code>. You'll need the item ID for commands like <code>/sell</code> and <code>/trade</code>.",
   "Use <code>/wish</code> to make a wish. You can wish once every 2 hours.\n\nUse <code>/wish10</code> to make 10 wishes at once for 100 starglitter ✨.",
-  "Trading feature is coming soon! You'll be able to trade items with other players using <code>/trade &lt;itemId&gt;</code>.",
+  "📦 <b>Trade syntax:</b>\n <code>/trade [qty] &lt;item name or ID&gt; [qty] &lt;item name or ID&gt;</code>\n\nExamples:\n • <code>/trade diluc furina</code>\n• <code>/trade 2 diluc 1 furina</code>\n• <code>/trade skyward blade mistsplitter</code>\n\n Reply to the person you want to trade with! 🤝",
   "Available commands:\n\n<code>/wish</code> - Make a wish (every 2 hours)\n<code>/wish10</code> - Make 10 wishes (costs 100 starglitter)\n<code>/inv</code> - View your inventory\n<code>/get_id &lt;item_name&gt;</code> - Get an item's ID\n<code>/sell [amount] &lt;itemId&gt;</code> - Sell items for starglitter\n<code>/balance</code> - Check your starglitter balance"
 ]

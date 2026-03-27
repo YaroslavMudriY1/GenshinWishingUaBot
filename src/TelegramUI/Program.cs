@@ -1,6 +1,7 @@
 ﻿// SPDX-License-Identifier: MPL-2.0
 
 using System;
+using System.Linq;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -16,6 +17,7 @@ namespace TelegramUI
     {
         private static void Main()
         {
+            Wish.EnsureDoAutoUseColumnExists();
             TaskScheduler.Instance.ScheduleDailyReset(); // Reset wish at startup
             TaskScheduler.Instance.ScheduleDailyRewardReset(); // Reset daily rewards at startup
 
@@ -70,6 +72,44 @@ namespace TelegramUI
                 }
             }
 
+            else if (callbackQuery.Data.StartsWith("set_lang:"))
+            {
+                var parts = callbackQuery.Data.Split(':');
+                if (parts.Length == 3 && long.TryParse(parts[1], out long langChatId))
+                {
+                    // Повторна перевірка прав — щоб не можна було викликати колбек без прав
+                    bool isAdmin = false;
+                    try
+                    {
+                        var admins = await Bot.GetChatAdministratorsAsync(langChatId);
+                        isAdmin = admins.Any(a => a.User.Id == callbackQuery.From.Id);
+                    }
+                    catch { }
+
+                    if (!isAdmin)
+                    {
+                        await Bot.AnswerCallbackQueryAsync(
+                            callbackQuery.Id,
+                            "⛔ Only admins can change chat language.",
+                            showAlert: true);
+                        return;
+                    }
+
+                    string newLang = parts[2]; // "en" або "ua"
+                    Language.ChangeLanguageById(langChatId, newLang);
+
+                    await Bot.AnswerCallbackQueryAsync(
+                        callbackQuery.Id,
+                        $"✅ Language changed to {newLang.ToUpper()}");
+
+                    await Bot.EditMessageTextAsync(
+                        langChatId,
+                        callbackQuery.Message.MessageId,
+                        $"✅ Chat language set to <b>{newLang.ToUpper()}</b>.",
+                        parseMode: ParseMode.Html,
+                        replyMarkup: null);
+                }
+            }
             // Handler trade_accept and trade_decline
             else if (callbackQuery.Data.StartsWith("t_a_") || callbackQuery.Data.StartsWith("t_d_"))
             {

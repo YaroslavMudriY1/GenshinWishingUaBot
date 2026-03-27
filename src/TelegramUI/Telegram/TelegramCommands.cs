@@ -13,6 +13,8 @@ using TelegramUI.Commands;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
 using System.Data.SQLite;
+using System.Linq;
+using System.Threading.Tasks;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 using TelegramUI.Strings.Misc;
@@ -21,6 +23,39 @@ namespace TelegramUI.Telegram
 {
     public static class TelegramCommands
     {
+        // Random reward. Get 10 starglitters from 'jokes'
+        private static async Task GiveRandomReward(MessageEventArgs e)
+        {
+            try
+            {
+                var targetUserId = e.Message.From.Id; 
+                var targetChatId = e.Message.Chat.Id;
+                int starAmount = 10;
+
+                Wish.AddStarglitter(targetUserId, targetChatId, starAmount);
+                int newBalance = Wish.GetStarglitter(targetUserId, targetChatId);
+
+                await Bot.SendTextMessageAsync(
+                    targetChatId,
+                    $"🎉 Lucky drop!\nYou received {starAmount}✨\nNew balance: {newBalance}✨",
+                    replyToMessageId: e.Message.MessageId);
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
+        }
+        // Cooldown for reward (anti-spam)
+        private static Dictionary<long, DateTime> lastRewardTime = new();
+
+        private static bool CanReceiveReward(long userId)
+        {
+            if (!lastRewardTime.ContainsKey(userId))
+                return true;
+
+            return (DateTime.UtcNow - lastRewardTime[userId]).TotalSeconds > 30;
+        }
+        
         internal static async void BotOnMessage(object sender, MessageEventArgs e)
         {
             if (e.Message == null || e.Message.Type != MessageType.Text) return;
@@ -113,20 +148,26 @@ namespace TelegramUI.Telegram
                 {
                     // Handle exceptions here
                 }
-
+                
+                if (textsList == null)
+                {
+                    Console.WriteLine($"Critical: failed to load language strings for chat {e.Message.Chat.Id}");
+                    return;
+                }
 
                 switch (msg)
                 {
                     case "/inv" or "/inventory" or "/інвентар":
                         var results = Inventory.InventoryFetch(e.Message);
-                        
+
                         while (true)
                         {
                             try
                             {
                                 await Bot.SendTextMessageAsync(
                                     e.Message.Chat,
-                                    string.Format(textsList[2], HttpUtility.HtmlEncode(e.Message.Chat.Title), HttpUtility.HtmlEncode(e.Message.From.FirstName), results),
+                                    string.Format(textsList[2], HttpUtility.HtmlEncode(e.Message.Chat.Title),
+                                        HttpUtility.HtmlEncode(e.Message.From.FirstName), results),
                                     replyToMessageId: e.Message.MessageId,
                                     parseMode: ParseMode.Html);
                                 break;
@@ -136,6 +177,7 @@ namespace TelegramUI.Telegram
                                 // ignored
                             }
                         }
+
                         break;
 
                     case "/wish" or "/w" or "/молитва":
@@ -145,7 +187,7 @@ namespace TelegramUI.Telegram
                         if (Wish.HasRolled(e.Message) == 1) // Check if user already rolled
                         {
                             int userBalance = Wish.GetStarglitter(userId, chatId);
-                            DateTime lastWish;  //Get last wish time info
+                            DateTime lastWish; //Get last wish time info
                             int hourDiff, minuteDiff;
 
                             using var con0 = new SQLiteConnection(MainDb());
@@ -153,7 +195,8 @@ namespace TelegramUI.Telegram
                             using var cmd0 = new SQLiteCommand(con0);
                             cmd0.Parameters.AddWithValue("@user", userId);
                             cmd0.Parameters.AddWithValue("@chat", chatId);
-                            cmd0.CommandText = "SELECT LastWishTime FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
+                            cmd0.CommandText =
+                                "SELECT LastWishTime FROM UsersInChats WHERE UserId = @user AND ChatId = @chat";
                             var lastWishTime = cmd0.ExecuteScalar();
                             con0.Close();
 
@@ -170,29 +213,30 @@ namespace TelegramUI.Telegram
                             if (minuteDiff < 0) minuteDiff = 0;
 
                             // Variant 1: Auto-wish on, starglitter balance >10.
-                            if (Wish.GetAutoWishSetting(userId,chatId)&&Wish.GetStarglitter(userId,chatId) >= 10) // If user have 10 or more Starglitters
+                            if (Wish.GetAutoWishSetting(userId, chatId) &&
+                                Wish.GetStarglitter(userId, chatId) >= 10) // If user have 10 or more Starglitters
                             {
-                                Wish.UseStarglitter(userId,chatId, 10); // Use it for extra wish (ignores timer)
+                                Wish.UseStarglitter(userId, chatId, 10); // Use it for extra wish (ignores timer)
 
                                 int newBalance = Wish.GetStarglitter(userId, chatId); // Check balance after use
 
-                                    try
-                                    {
-                                        await Bot.SendTextMessageAsync(
-                                            e.Message.Chat.Id,
-                                            string.Format(textsList[4], newBalance),
-                                            replyToMessageId: e.Message.MessageId);
+                                try
+                                {
+                                    await Bot.SendTextMessageAsync(
+                                        e.Message.Chat.Id,
+                                        string.Format(textsList[4], newBalance),
+                                        replyToMessageId: e.Message.MessageId);
 
-                                    }
-                                    catch (Exception exception)
-                                    {
+                                }
+                                catch (Exception exception)
+                                {
                                     // Exceprion ignored
                                     //Console.WriteLine("Error while sending message. Starglitter: " + exception.ToString());
                                 }
 
                             }
                             // Variant 2: Not enough starglitter (<10)
-                            else if (Wish.GetStarglitter(userId, chatId) <= 10)
+                            else if (Wish.GetStarglitter(userId, chatId) < 10)
                             {
                                 // Tell user they need to wait
                                 await Bot.SendTextMessageAsync(
@@ -236,7 +280,7 @@ namespace TelegramUI.Telegram
                         //If wish availiable, update wish time
                         Wish.SetWishTime(userId, chatId);
 
-                        var onePull = Wish.GetCharacterPull(e.Message,true);  // Wish output message      
+                        var onePull = Wish.GetCharacterPull(e.Message, true); // Wish output message      
                         //int starRarity = Wish.ExtractRarityFromOnePull(onePull); //Get wish.Stars from ouput message
 
                         var rankResult = RankSystem.AddExperience(userId, chatId, Convert.ToInt32(onePull[2]));
@@ -282,6 +326,7 @@ namespace TelegramUI.Telegram
                                 // ignored
                             }
                         }
+
                         break;
 
                     case "/wish10" or "/w10" or "/десятка":
@@ -327,7 +372,9 @@ namespace TelegramUI.Telegram
                                 }
                             }
 
-                            int newBalance10 = Wish.GetStarglitter(userId10, chatId10); // Get new balance. Wishes may add starglitter as cashback
+                            int newBalance10 =
+                                Wish.GetStarglitter(userId10,
+                                    chatId10); // Get new balance. Wishes may add starglitter as cashback
 
                             string resultMessage = string.Format(textsList[7], newBalance10, getWish10Sum);
 
@@ -352,7 +399,8 @@ namespace TelegramUI.Telegram
                             if (leveledUp)
                             {
                                 var rankTitle = RankSystem.GetRankTitle(finalRankResult.NewLevel);
-                                var progressBar = RankSystem.GetExpProgressBar(finalRankResult.CurrentExp, finalRankResult.ExpToNext);
+                                var progressBar = RankSystem.GetExpProgressBar(finalRankResult.CurrentExp,
+                                    finalRankResult.ExpToNext);
 
                                 try
                                 {
@@ -386,8 +434,9 @@ namespace TelegramUI.Telegram
                                 // ignored
                             }
                         }
+
                         break;
-                
+
                     // If user wants to check their rank
                     case "/rank" or "/myRank" or "/r" or "/level" or "/myLevel" or "/lvl":
                         var userIdRank = e.Message.From.Id;
@@ -407,6 +456,7 @@ namespace TelegramUI.Telegram
                         break;
 
                     case "/me" or "/info":
+                    {
                         var userInfo = Inventory.GetUserInfo(e.Message);
 
                         while (true)
@@ -425,7 +475,29 @@ namespace TelegramUI.Telegram
                                 // ignored
                             }
                         }
+
                         break;
+                    }
+
+                case "/stats" or "/stat":
+                    {
+                        long? targetId = null;
+                        string targetName = null;
+
+                        if (e.Message.ReplyToMessage != null)
+                        {
+                            targetId   = e.Message.ReplyToMessage.From.Id;
+                            targetName = e.Message.ReplyToMessage.From.FirstName;
+                        }
+
+                        var stats = Inventory.GetUserStats(e.Message, targetId, targetName);
+                        await Bot.SendTextMessageAsync(
+                            e.Message.Chat.Id,
+                            stats,
+                            replyToMessageId: e.Message.MessageId,
+                            parseMode: ParseMode.Html);
+                        break;
+                    }
 
                     case "/getInfo" or "/get_info":
                         if (e.Message.ReplyToMessage != null)
@@ -516,7 +588,8 @@ namespace TelegramUI.Telegram
                         await Bot.SendTextMessageAsync(
                             e.Message.Chat.Id,
                             string.Format(textsList[13]), // Message about /trade command
-                            replyToMessageId: e.Message.MessageId);
+                            replyToMessageId: e.Message.MessageId,
+                            parseMode: ParseMode.Html);
                         break;
 
                     case string s when s.StartsWith("/trade ") || s.StartsWith("/трейд "):
@@ -574,29 +647,32 @@ namespace TelegramUI.Telegram
                                 var userIdTo = e.Message.ReplyToMessage.From.Id;
                                 var chatIdTrade = e.Message.Chat.Id;
 
-                                var confirmTradeButton = InlineKeyboardButton.WithCallbackData(
-                                    "✅ Accept trade",
-                                    $"confirm_trade:{userIdFrom}:{userIdTo}:{offerItemId}:{offerQuantity}:{requestItemId}:{requestQuantity}"
-                                );
-
-                                var cancelTradeButton = InlineKeyboardButton.WithCallbackData(
-                                    "❌ Decline",
-                                    $"cancel_trade:{userIdTo}:{userIdFrom}"
-                                );
-
-                                var tradeKeyboard = new InlineKeyboardMarkup(new[]
-                                {
-                                    new[] { confirmTradeButton },
-                                    new[] { cancelTradeButton }
-                                });
+                                // Unused keyboard
+                                // var confirmTradeButton = InlineKeyboardButton.WithCallbackData(
+                                //     "✅ Accept trade",
+                                //     $"confirm_trade:{userIdFrom}:{userIdTo}:{offerItemId}:{offerQuantity}:{requestItemId}:{requestQuantity}"
+                                // );
+                                //
+                                // var cancelTradeButton = InlineKeyboardButton.WithCallbackData(
+                                //     "❌ Decline",
+                                //     $"cancel_trade:{userIdTo}:{userIdFrom}"
+                                // );
+                                //
+                                // var tradeKeyboard = new InlineKeyboardMarkup(new[]
+                                // {
+                                //     new[] { confirmTradeButton },
+                                //     new[] { cancelTradeButton }
+                                // });
 
                                 var tradeMessage = await Bot.SendTextMessageAsync(
                                     e.Message.Chat.Id,
-                                    $"{HttpUtility.HtmlEncode(e.Message.From.FirstName)} offers {offerQuantity}x {offerItem} to {HttpUtility.HtmlEncode(e.Message.ReplyToMessage.From.FirstName)} in exchange for {requestQuantity}x {requestItem}",
+                                    $"{HttpUtility.HtmlEncode(e.Message.From.FirstName)} offers {offerQuantity}x " +
+                                    $"{offerItem} to {HttpUtility.HtmlEncode(e.Message.ReplyToMessage.From.FirstName)} " +
+                                    $"in exchange for {requestQuantity}x {requestItem}",
                                     replyToMessageId: e.Message.ReplyToMessage.MessageId,
                                     parseMode: ParseMode.Html,
                                     replyMarkup: tradeResult.ReplyMarkup);
-
+                                
                                 // Update MessageId and start timer
                                 await Trade.UpdateMessageIdAndStartTimer(
                                     tradeResult.TradeKey,
@@ -737,41 +813,34 @@ namespace TelegramUI.Telegram
                             }
                         }
                         break;
-                    case "/get_inv":
-                        if (e.Message.ReplyToMessage != null)
+                    
+                    case "/get_inv" or "/peek" or "/getInv":
+                    {
+                        if (e.Message.ReplyToMessage == null)
                         {
-                            var targetUser = e.Message.ReplyToMessage.From;
-                            var targetUserId = targetUser.Id;
-                            string targetUsername = targetUser.FirstName;
-
-                            var userInv = Inventory.InventoryFetch(e.Message, targetUserId, targetUsername);
-
-                            while (true)
-                            {
-                                try
-                                {
-                                    await Bot.SendTextMessageAsync(
-                                        e.Message.Chat,
-                                        string.Format(textsList[18], HttpUtility.HtmlEncode(e.Message.Chat.Title), HttpUtility.HtmlEncode(targetUsername), userInv),
-                                        replyToMessageId: e.Message.MessageId,
-                                        parseMode: ParseMode.Html);
-                                    break;
-                                }
-                                catch (Exception exception)
-                                {
-                                    // ignored
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // If command sent not in reply
                             await Bot.SendTextMessageAsync(
                                 e.Message.Chat.Id,
-                                "This command must be used in reply to another user's message.",
-                                replyToMessageId: e.Message.MessageId);
+                                "👀 Reply to someone's message to peek at their inventory!\n" +
+                                "Example: reply to a message and type <code>/peek</code>",
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                            break;
                         }
+
+                        var target   = e.Message.ReplyToMessage.From;
+                        var peekInv  = Inventory.InventoryFetch(e.Message, target.Id, target.FirstName);
+                        var peekText = string.Format(textsList[18],
+                            HttpUtility.HtmlEncode(e.Message.Chat.Title),
+                            HttpUtility.HtmlEncode(target.FirstName),
+                            peekInv);
+
+                        await Bot.SendTextMessageAsync(
+                            e.Message.Chat,
+                            peekText,
+                            replyToMessageId: e.Message.MessageId,
+                            parseMode: ParseMode.Html);
                         break;
+                    }
 
                     case "/resetUser":
                         if (e.Message.From.Id.ToString() != AdminId()) return;
@@ -803,25 +872,81 @@ namespace TelegramUI.Telegram
                         break;
 
                     case "/settings":
+                    {
                         var userIdSettings = e.Message.From.Id;
                         var chatIdSettings = e.Message.Chat.Id;
                         bool autoWishEnabled = Wish.GetAutoWishSetting(userIdSettings, chatIdSettings);
-                        string statusText = autoWishEnabled ? "On" : "off";
+                        string statusText = autoWishEnabled ? "✅ On" : "❌ Off";
                         string buttonText = autoWishEnabled ? "Turn off auto-wish" : "Turn on auto-wish";
 
-                        var keyboard = new InlineKeyboardMarkup(new[]
+                        // Check if user is chat admin
+                        bool isAdmin = false;
+                        try
                         {
-                          new []
-                                {
-                              InlineKeyboardButton.WithCallbackData(buttonText, $"toggle_autowish:{userIdSettings}:{chatIdSettings}")
-                                }
+                            var admins = await Bot.GetChatAdministratorsAsync(chatIdSettings);
+                            isAdmin = admins.Any(a => a.User.Id == userIdSettings);
+                        }
+                        catch
+                        {
+                            /* ignored */
+                        }
+
+                        // Personal Settings (for everyone)
+                        var userKeyboardRows = new List<InlineKeyboardButton[]>
+                        {
+                            new[]
+                            {
+                                InlineKeyboardButton.WithCallbackData(
+                                    buttonText,
+                                    $"toggle_autowish:{userIdSettings}:{chatIdSettings}")
+                            }
+                        };
+
+                        string settingsText =
+                            $"⚙️ <b>Settings for {HttpUtility.HtmlEncode(e.Message.From.FirstName)}</b>\n\n" +
+                            $"👤 <b>Personal</b>\n" +
+                            $"  Auto-wish (uses ✨ to skip timer): {statusText}\n";
+
+                        // Chat settings — only for admins
+                        if (isAdmin)
+                        {
+                            string currentLang = GetLanguage(e.Message);
+                            settingsText +=
+                                $"\n🛠 <b>Chat settings</b> (admin only)\n" +
+                                $"  Language: <b>{currentLang.ToUpper()}</b>";
+
+                            userKeyboardRows.Add(new[]
+                            {
+                                InlineKeyboardButton.WithCallbackData(
+                                    "🌐 Switch to EN",
+                                    $"set_lang:{chatIdSettings}:en"),
+                                InlineKeyboardButton.WithCallbackData(
+                                    "🌐 Switch to UA",
+                                    $"set_lang:{chatIdSettings}:ua")
                             });
+                        }
 
                         await Bot.SendTextMessageAsync(
                             chatId: e.Message.Chat.Id,
-                            text: $"Personal setting of user {e.Message.From.FirstName}.\nAuto-wish status: {statusText}.",
-                            replyMarkup: keyboard,
-                            replyToMessageId: e.Message.MessageId);
+                            text: settingsText,
+                            replyMarkup: new InlineKeyboardMarkup(userKeyboardRows),
+                            replyToMessageId: e.Message.MessageId,
+                            parseMode: ParseMode.Html);
+                        break;
+                    }
+                    case "/help":
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                textsList[27], // General help text with all commands
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
                         break;
 
                     case "/ask_paimon":
@@ -999,15 +1124,10 @@ namespace TelegramUI.Telegram
                                 //ignored
                             }
                         }
-                        else if (e.Message.Text.StartsWith("/") && e.Message.ReplyToMessage.From.Id == Bot.BotId)
-                            await Bot.SendTextMessageAsync(
-                           chatId: e.Message.Chat.Id,
-                           text: $"EHE TE NANDAYO?!!\n Non existing command!",
-                           replyToMessageId: e.Message.MessageId);
                         
                         break;
                 }
-
+                
                 // This will handle FAQ responses when users reply to the bot's messages
                 // Also have entertainment functions (for fun)
                 // Check if message is a reply to the bot's message
@@ -1026,11 +1146,18 @@ namespace TelegramUI.Telegram
                         lowerMessage.Contains("joke"))
                     {
                         await Language.RandomJoke(e);
+                        var roll = Random.Shared.Next(100); // 0–99
+
+                        if (roll == 0 && CanReceiveReward(e.Message.From.Id))
+                        {
+                            lastRewardTime[e.Message.From.Id] = DateTime.UtcNow;
+                            await GiveRandomReward(e);
+                        }
                         return;
                     }
 
                     // FAQ patterns for selling items
-                    if (lowerMessage.Contains("як продати") ||
+                    else if (lowerMessage.Contains("як продати") ||
                         lowerMessage.Contains("how to sell") ||
                         lowerMessage.Contains("продати") ||
                         lowerMessage.Contains("продаж") ||
@@ -1092,7 +1219,7 @@ namespace TelegramUI.Telegram
                     }
                     // FAQ patterns for wishing
                     else if (lowerMessage.Contains("бажання") ||
-                             lowerMessage.Contains("wish") ||
+                             lowerMessage.Contains("wishes") ||
                              lowerMessage.Contains("молитв") ||
                              lowerMessage.Contains("банер") ||
                             lowerMessage.Contains("віш"))
@@ -1196,13 +1323,116 @@ namespace TelegramUI.Telegram
                             // ignored
                         }
                     }
+                    else if (lowerMessage.Contains("genshin")||(lowerMessage.Contains("impact")))
+                    {                        var responses = new[]
+                        {
+                            "Thank you... Genshin Impact.\n -What?\n Um.. You the one who survived the gods' impact?\n-This... sounds right.",
+                            "Does this... A reference??",
+                            "EVIL CHINESE CASINO",
+                            "Damn you, Wei!",
+                            "Glory to party leader Wei."
+                        };
+                            
+                        var rnd = new Random();
+                        var response = responses[rnd.Next(responses.Length)];
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                response,
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
+                    else if (lowerMessage.Contains("zenless")||(lowerMessage.Contains("zone")||(lowerMessage.Contains("zero"))))
+                    {
+                        var responses = new[]
+                        {
+                            "I'm zenless this zone 'till I'm zero.",
+                            "Well be my guest, I will let you guess...",
+                            "DAAAYUMN",
+                            "This zone seems... Zenless",
+                            "Thank you... Zenless Zone Zero.\n-Zenless Zone Zero?\nBecause uhm... You were fighting Zenless in Zone Zero.\n-Oh, yeah."
+                        };
+                            
+                        var rnd = new Random();
+                        var response = responses[rnd.Next(responses.Length)];
+                        try
+                        {
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                response,
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
+                    else if (lowerMessage.Contains("endfield")||(lowerMessage.Contains("arknights")))
+                    {
+                        try
+                        {
+                            var responses = new[]
+                            {
+                                "This is my field, and I'm arknighting this 'till end...\n\nWhat?..",
+                                "Arknighting this field... sounds illegal, but I'm in.",
+                                "Thank you... Arknights: Enfield.\n-Arknights Endfield?\nBecause um... You were endfielding the Arknights.\nWTF DOES IT EVEN MEAN???",
+                                "Endfield? Sounds like where my sanity ended.",
+                                "This field belongs to Endfield now. No refunds.",
+                                "Factory must grow.",
+                                "We'll knight this Ark, Endfielders!"
+                            };
+                            
+                            var rnd = new Random();
+                            var response = responses[rnd.Next(responses.Length)];
+
+                            await Bot.SendTextMessageAsync(
+                                e.Message.Chat.Id,
+                                response,
+                                replyToMessageId: e.Message.MessageId,
+                                parseMode: ParseMode.Html);
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
+                    else if (lowerMessage.Contains("punchline")||(lowerMessage.Contains("oneliner")))
+                    {
+                        try
+                        {
+                            await Language.RandomPun(e);
+                            
+                            var roll = Random.Shared.Next(100); // 0–99
+
+                            if (roll == 0 && CanReceiveReward(e.Message.From.Id))
+                            {
+                                lastRewardTime[e.Message.From.Id] = DateTime.UtcNow;
+                                await GiveRandomReward(e);
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            // ignored
+                        }
+                    }
+                    else if (lowerMessage.Contains("settings"))
+                    {
+                        //skip settings command here, handled above
+                    }
                     else
                     {
                         try
                         {
                             await Bot.SendTextMessageAsync(
                                 e.Message.Chat.Id,
-                                text: "Please, give me a break!\nUse /help for assistance.",
+                                text: "EHE TE NANDAYO?!!\nPlease, give me a break!\nUse /help for assistance.",
                                 replyToMessageId: e.Message.MessageId,
                                 parseMode: ParseMode.Html);
                         }

@@ -66,17 +66,18 @@ namespace TelegramUI.Commands
                 }
             }
 
+
+            var items = typeof(Wish).Assembly.GetManifestResourceStream(
+                $"TelegramUI.Strings.Items.{GetLanguage(message)}.json");
+            var sR = new StreamReader(items);
+            var itemsList = JsonSerializer.Deserialize<List<Items>>(sR.ReadToEnd());
+            sR.Close();
+                
             // Linking item IDs to actual data
             for (var i = 0; i <= itemIds.Count - 1; i++)
             {
+
                 var id = itemIds[i];
-
-                var items = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.Items.{GetLanguage(message)}.json");
-                var sR = new StreamReader(items);
-                var itemsText = sR.ReadToEnd();
-                sR.Close();
-
-                var itemsList = JsonSerializer.Deserialize<List<Items>>(itemsText);
                 var item = itemsList.Find(x => x.Id.Contains(id));
 
                 switch (item.Stars)
@@ -264,6 +265,95 @@ namespace TelegramUI.Commands
             return results;
         }
 
+        internal static string GetUserStats(Message message, long? targetUserId = null, string targetUsername = null)
+        {
+            long userIdToCheck = targetUserId ?? message.From.Id;
+            string nameToShow = targetUsername ?? message.From.FirstName;
+
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+
+            int totalWishes = 0, starglitter = 0, fourPity = 0, fivePity = 0;
+            bool fiftyLose = false;
+            string lastWishTime = "N/A";
+
+            using (var cmd = new SQLiteCommand(con))
+            {
+                cmd.Parameters.AddWithValue("@u", userIdToCheck);
+                cmd.Parameters.AddWithValue("@c", message.Chat.Id);
+                cmd.CommandText =
+                    "SELECT TotalWishes, Starglitter, FourPity, FivePity, FiftyLose, LastWishTime " +
+                    "FROM UsersInChats WHERE UserId = @u AND ChatId = @c";
+
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read())
+                {
+                    totalWishes = rdr.GetInt32(0);
+                    starglitter  = rdr.GetInt32(1);
+                    fourPity     = rdr.GetInt32(2);
+                    fivePity     = rdr.GetInt32(3);
+                    fiftyLose    = rdr.GetBoolean(4);
+                    if (!rdr.IsDBNull(5))
+                    {
+                        var dt = DateTime.ParseExact(rdr.GetString(5),
+                            "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        lastWishTime = dt.ToString("HH:mm dd.MM.yyyy");
+                    }
+                }
+            }
+
+            // Count items by rarity
+            int count5 = 0, count4 = 0, count3 = 0;
+            using (var cmd2 = new SQLiteCommand(con))
+            {
+                cmd2.Parameters.AddWithValue("@u", userIdToCheck);
+                cmd2.Parameters.AddWithValue("@c", message.Chat.Id);
+                cmd2.CommandText =
+                    "SELECT ii.ItemId, ii.Count FROM InventoryItems ii " +
+                    "WHERE ii.UserId = @u AND ii.ChatId = @c";
+
+                var itemStream = typeof(Wish).Assembly
+                    .GetManifestResourceStream(
+                        $"TelegramUI.Strings.Items.{Language.GetLanguage(message)}.json");
+                var allItems = JsonSerializer.Deserialize<List<Items>>(
+                    new StreamReader(itemStream).ReadToEnd());
+
+                using var rdr2 = cmd2.ExecuteReader();
+                while (rdr2.Read())
+                {
+                    var item = allItems.Find(x => x.Id == rdr2.GetString(0));
+                    if (item == null) continue;
+                    int cnt = rdr2.GetInt32(1);
+                    if (item.Stars == 5) count5 += cnt;
+                    else if (item.Stars == 4) count4 += cnt;
+                    else count3 += cnt;
+                }
+            }
+
+            con.Close();
+
+            var (level, exp, expToNext) = RankSystem.GetUserRankInfo(userIdToCheck, message.Chat.Id);
+            var rankTitle = RankSystem.GetRankTitle(level);
+            var bar = RankSystem.GetExpProgressBar(exp, expToNext);
+
+            // 5* chance for next wish (simpler)
+            double fiveChance = Math.Min(100.0, 1.6 + Math.Max(0, fivePity - 20) * 6.0);
+            string eventPityStr = fiftyLose ? "✅ guaranteed" : "50/50";
+
+            return
+                $"📊 <b>Stats — {HttpUtility.HtmlEncode(nameToShow)}</b>\n\n" +
+                $"🎯 Total wishes: <b>{totalWishes}</b>\n" +
+                $"✨ Starglitter: <b>{starglitter}</b>\n\n" +
+                $"⭐ 5★ pity: <b>{fivePity}/30</b>  (~{fiveChance:F0}% next pull)\n" +
+                $"🌟 4★ pity: <b>{fourPity}/7</b>\n" +
+                $"🎭 Event 5★: {eventPityStr}\n\n" +
+                $"🎒 Collected: " +
+                $"<b>{count5}</b> ×5★  <b>{count4}</b> ×4★  <b>{count3}</b> ×3★\n\n" +
+                $"📈 Level {level} {rankTitle}\n" +
+                $"⚡ {bar}\n\n" +
+                $"🕐 Last wish: {lastWishTime}";
+        }
+        
         internal static string GetItemId(Message message, string itemName)
         {
             string result = "";
@@ -300,12 +390,41 @@ namespace TelegramUI.Commands
             }
             catch (Exception ex)
             {
+                // ignored
             }
 
             return result;
         }
         
-        // Method for selling item. Enter item id and (neceserraly) amount
+        // Fuzzy search for items
+        internal static (string id, string name, int found)? FindItemByQuery(string query, string language)
+        {
+            var stream = typeof(Wish).Assembly
+                .GetManifestResourceStream($"TelegramUI.Strings.Items.{language}.json");
+            var itemsList = JsonSerializer.Deserialize<List<Items>>(new StreamReader(stream).ReadToEnd());
+
+            query = query.Trim().ToLower();
+
+            // 1. Exact match by ID
+            var byId = itemsList.Find(x => x.Id.ToLower() == query);
+            if (byId != null) return (byId.Id, byId.Name, 1);
+
+            // 2. Exact match by title
+            var byName = itemsList.Find(x => x.Name.ToLower() == query);
+            if (byName != null) return (byName.Id, byName.Name, 1);
+
+            // 3. Partial match — check all matches
+            var partial = itemsList
+                .Where(x => x.Name.ToLower().Contains(query))
+                .ToList();
+
+            if (partial.Count == 1) return (partial[0].Id, partial[0].Name, 1);
+            if (partial.Count > 1)  return (null, string.Join(", ", partial.Take(5).Select(x => x.Name)), partial.Count);
+
+            return null;
+        }
+        
+        // Method for selling item. Enter item id and amount (neceserraly, default=1)
         internal static string SellItem(Message message, string itemId, int amount = 1)
         {
             // Default values

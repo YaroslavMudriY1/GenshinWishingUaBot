@@ -46,17 +46,30 @@ namespace TelegramUI.Commands
             con.Close();
         }
 
+        internal static void ChangeLanguageById(long chatId, string locale)
+        {
+            using var con = new SQLiteConnection(MainDb());
+            con.Open();
+            using var cmd = new SQLiteCommand(con);
+            cmd.Parameters.Add(new SQLiteParameter("@chat", chatId));
+            cmd.Parameters.Add(new SQLiteParameter("@locale", locale));
+            cmd.CommandText = "UPDATE Chats SET Language = @locale WHERE ChatId = @chat";
+            cmd.ExecuteNonQuery();
+            con.Close();
+        }
+        
         internal static string GetLanguage(Message message)
         {
             using var con = new SQLiteConnection(MainDb());
             con.Open();
             var language = "en";
 
-            if (!string.IsNullOrEmpty(message.Text) && message.Text.StartsWith("/lang"))
-            {
-                // Handle /lang command without specifying a language
-                return language;
-            }
+            // Cropped DB request, language didn't read
+            // if (!string.IsNullOrEmpty(message.Text) && message.Text.StartsWith("/lang"))
+            // {
+            //     // Handle /lang command without specifying a language
+            //     return language;
+            // }
 
             using var cmd = new SQLiteCommand(con);
             cmd.Parameters.Add(new SQLiteParameter("@chat", message.Chat.Id));
@@ -122,7 +135,40 @@ namespace TelegramUI.Commands
             }         
 
 
+        }
+        
+        public static async Task RandomPun(MessageEventArgs e)
+        {
+            try
+            {
+                var resourceName = $"TelegramUI.Strings.Misc.puns_{GetLanguage(e.Message)}.json";
+                var puns = LoadEmbeddedJsonList(resourceName);
+
+                if (puns != null && puns.Count > 0)
+                {
+                    var rnd = new Random();
+                    var randomPun = puns[rnd.Next(puns.Count)];
+
+                    await Bot.SendTextMessageAsync(
+                        e.Message.Chat.Id,
+                        randomPun,
+                        replyToMessageId: e.Message.MessageId);
+                }
+                else
+                {
+                    await Bot.SendTextMessageAsync(
+                        e.Message.Chat.Id,
+                        "No punchlines? No one-liners?\nWhere's your humor?\n",
+                        replyToMessageId: e.Message.MessageId);
+                }
             }
+            catch (Exception exception)
+            {
+                // Handle exceptions here
+            }         
+
+        }
+        
         public static async Task RandomPaimonPhrase(MessageEventArgs e)
         {
             try
