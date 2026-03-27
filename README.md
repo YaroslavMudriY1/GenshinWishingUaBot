@@ -1,78 +1,194 @@
 # GenshinWishingBot
 
-A Telegram chat bot that simulates Genshin Impact wishes. Built with C#, .NET 8.0 and SQLite as RDBMS.
+A Telegram group chat bot simulating Genshin Impact gacha wishes.  
+Built with C# · .NET 8 · SQLite · Telegram.Bot 16
 
-***Current version 5.6' (ua/en)***
+**Version 1.6 · Content: patch 5.6 · Languages: 🇺🇦 UA / 🇬🇧 EN**
+> Try it live: `@WishGenshinUaBot` (group chats only)
 
-### Patch Note (Major Update 1.5)
+---
 
-"Rise and Rank, Traveler!"
-- `/rank` – Ever wondered how much of a Genshin gacha gremlin you’ve become? Now you can flex your level and see your EXP bar! (No, you can’t pay to win. Yet.)
-- `/me` – Because sometimes you just want to admire yourself. Shows your stats, not your IRL luck.
-- `/get_info` and `/get_inv` (in respond) – Stalk your friends’ stats and inventories (with consent, of course – reply to their message!).
-- `/daily` – Claim your daily 3✨ Starglitter! Like a login bonus, but you don’t have to open Hoyoverse’s launcher.
-- `/gift` [amount] (in respond) – Feeling generous? Send Starglitter to your friends! Feeling evil? Remind them you have more. 
-- **Rank System** – Every wish now gives you EXP. The more you wish, the higher you climb. Gacha addiction, now with levels!
-- *Easter Eggs* – New hidden jokes and surprises. Try weird stuff. Paimon dares you to ask (`/ask_paimon`).
-- *Minor Fixes* – We squashed bugs, not Paimon. Probably.
+## Features
 
-### Previous changes (Major Update 1.3 and 1.4, compared to original functionality)
-- New commands! Now you can `/trade` and `/sell` your items! For that commands you need to know item ID (by `/get_id`) If you don't know how use that commands - don't worry! Just type command (without attributes) in chat and bot will answer!
-- Bot can react to key words like "how to *wish*?" if sended in reply to bot messages. Check other commands by "`?`".
-- *Added jokes!* Just send "joke"/"rofl"/"meme" in reply to bot! 
-- Added **a lot of weapons**, missing characters, assets, in short filling gaps to the last patch (5.3*). <ins>Reworked strings (added new details), now English and Ukrainian versions matches.</ins>
-- Enhanced **skin system**, now it randomized. For characters with alternate skins (*Amber, Jean, Mona, Rosaria*) alternate skin chance is **50%** (event skin more priority). For event skins (lantern rite, summer) chance is **30%**. For 5✧ skins (*Diluc*) chance is **20%**.
-- Added **50/50 system**, for event 5✧ weapons and characters. If hits 5✧, randomizer (50/50) checks if it event one. If you lose, it'll be saved in DB, and next time you get guaranteed event 5✧. Check "Event 5✧" in `/inv`.
-- Used **in-game wish rate** (different for 5✧ weapon and characters), but *pity was substract to 30* for 5✧ and 7 for 4✧. >(It's just a telegram bot for fun, right?)
-- **Added Starglitter✨**, cashback for wishes. If you have 10+ ✨, just type `/wish` to extra wish, ignoring timer. To check your ✨ use `/balance`. From different wish results, gives different amount of Starglitter (check wish message): 
-*1th 5✧ - 10✨, 1th 4✧ - 3✨, dublicate 5✧ - 10✨, 4✧ - 2✨, 7th+ char|6th+ weapon (>C6|R5) 5✧ - 25✨, 4✧ (>C6|R5) - 5✨*.
-- **Updated timer!** Now it works correctly in wish messages. Last wish time saves in DB. When bot launches or after 02:00 o'clock (UTC+2|+3) timer resets for everyone. *Curently bot setted for every 2-hour wishes.*
-- **Expanded inventory!** Now you can see your pity, all-time wishes and starglitter balance in `/inv`.
-- **Added 10 wishes command!** You can spend 100✨ to quickly make ten wishes. Results be in one message.
+- 🎲 Wish simulation with in-game pull rates, pity system (30 / 7) and 50/50 mechanic
+- ✨ Starglitter economy — earn from pulls, spend to bypass the timer
+- 🗂️ Per-user per-chat inventory with full rarity breakdown
+- 📈 Rank system — earn EXP every pull, level up for Starglitter rewards
+- 🔁 Item trading between players
+- 💬 Contextual FAQ and Easter eggs when replying to the bot
 
-*'current Genshin Impact patch - 5.6. Last bot update - 04.06.2025
+---
+## Commands
 
-### If you want to try bot, check `@WishGenshinUaBot` in telegram. (works only in groups)
+### Wishing
 
-## Usage
+| Command | Description |
+|---|---|
+| `/wish` · `/w` | Single wish. Once per 2 hours. Auto-bypasses timer if you have 10+ ✨ and Auto-wish is on. |
+| `/wish10` · `/w10` | 10 wishes at once. Costs 100 ✨. |
 
-Add this bot to your group chat and start using it right away.
+### Inventory & Profile
 
-### User commands:
-- /wish or /w - make a wish and get a randomized result, can wish once a two hour per chat, resets at 12PM UTC+0.
-- /wish10 or /w10 - make a ten wish, using 100 starglitter ✨. 
-- /inventory or /inv - get your inventory in the chat.
-- /balance or /b - get your starglitter✨ balance.
-- /daily - claim your daily 3✨ Starglitter.
-- /me - get your stats and level.
-- /trade [item_id] [amount] - trade items with other users. Use `/get_id` to get item ID.
-- /sell [item_id] [amount] - sell items to the bot and receive Starglitter. Use `/get_id` to get item ID.
-- /settings - get your settings (currently only auto-wish available).
+| Command | Description |
+|---|---|
+| `/inv` · `/inventory` | Your items by rarity + stats summary. |
+| `/me` · `/info` | Full profile: rank, EXP bar, pity, inventory totals. |
+| `/stats` *(or reply to view someone else's)* | Compact stats overview. |
+| `/rank` · `/level` · `/lvl` | Current level, rank title, EXP bar. |
+| `/balance` · `/b` | Current Starglitter ✨ balance. |
+| `/daily` | Claim 3 ✨ daily reward (resets at 02:00 server time). |
 
-### Admins commands:
-- /lang [code] (chat admins only) - change the locale for a specific chat, e.g. `/lang en`. Avaliable: `en, ua`.
-- /addStar [amount] (bot owner only) - reply to any user's message with this command to add some amount to user's starglitter balance.
-- /resetUser (bot owner only) - reply to any user's message with this command to reset his wish timer.
-- /resetChat (bot owner only) - send this to the chat to reset everyone's wish timers.
+### Items
+
+| Command | Description |
+|---|---|
+| `/get_id <name>` | Look up an item's ID. Supports partial names. |
+| `/sell [amount] <id>` | Sell items for Starglitter (5★→25✨, 4★→10✨, 3★→1✨). |
+
+### Social *(use in reply to another user's message)*
+
+| Command | Description |
+|---|---|
+| `/trade [qty] <item> [qty] <item>` | Offer a trade. Accepts item names or IDs. Expires in 15 min. |
+| `/gift <amount>` | Send Starglitter to another user. |
+| `/peek` · `/get_inv` | View another user's inventory. |
+| `/get_info` | View another user's full profile. |
+
+### Extras
+
+| Command | Description |
+|---|---|
+| `/ask_paimon` | Get a wish prediction from Paimon. |
+| `/settings` | Toggle Auto-wish. Admins also see chat language controls. |
+| `/help` | Full command list. |
+
+### Admin / Owner
+
+| Command | Who | Description |
+|---|---|---|
+| `/lang en` · `/lang ua` | Chat admin | Change chat language. |
+| `/addStar <amount>` *(reply)* | Bot owner | Add Starglitter to a user. |
+| `/resetUser` *(reply)* | Bot owner | Reset wish timer for one user. |
+| `/resetChat` | Bot owner | Reset everyone's wish timers in the chat. |
+
+---
+
+## Gacha Mechanics
+
+### Pull rates
+| Rarity | Characters | Weapons |
+|---|---|---|
+| 5★ | 1.6% | 1.8% |
+| 4★ | 13.0% | 14.5% |
+| 3★ | 85.4% | 83.7% |
+
+### Pity
+- **4★** guaranteed on the 7th wish without one
+- **5★** guaranteed on the 30th wish without one
+
+### 50/50
+On a 5★ pull there is a 50% chance of getting the event item. Losing the 50/50 guarantees the next 5★ will be the event item. Status visible in `/inv`.
+
+### Starglitter cashback
+
+| Scenario | Reward |
+|---|---|
+| First copy of a 5★ | 10 ✨ |
+| Duplicate 5★ (≤ C6 / R5) | 10 ✨ |
+| Over C6 / R5 for 5★ | 25 ✨ |
+| First copy of a 4★ | 3 ✨ |
+| Duplicate 4★ (≤ C6 / R5) | 2 ✨ |
+| Over C6 / R5 for 4★ | 5 ✨ |
+
+---
+
+## Rank System
+
+Every pull earns EXP (3★ → 1 · 4★ → 3 · 5★ → 10). Levelling up gives Starglitter rewards.
+
+| Level | Title | Level-up reward |
+|---|---|---|
+| 1–4 | 🆕 Newcomer | 10 + (lvl/10 × 2) ✨ |
+| 5–9 | 👤 Beginner | same |
+| 10–14 | 🌱 Novice | same |
+| 15–24 | 🎯 Hunter | same |
+| 25–39 | ⚔️ Adventurer | same |
+| 40–59 | 🛡️ Knight | same |
+| 60–79 | 🗡️ Adeptus | same |
+| 80–99 | ⚡ Archon | same |
+| 100+ | 🌟 Celestial Master | same |
+
+Milestone bonuses: every 5th level +50×(lvl/5) ✨ · every 10th level +100×(lvl/10) ✨
+
+---
+
+## FAQ
+
+**How often can I wish?**  
+Once every 2 hours per chat. All timers reset globally at 02:00 server time.
+
+**How does Auto-wish work?**  
+If Auto-wish is on (`/settings`) and your balance is ≥10 ✨, typing `/wish` while on cooldown will spend 10 ✨ and skip the timer automatically.
+
+**How do I trade?**  
+Reply to the other player's message and type `/trade [qty] <your item> [qty] <their item>`. Item names work directly — IDs are optional. The recipient has 15 minutes to accept or decline.  
+Example: `/trade 2 Diluc 1 Furina`
+
+**Items show as IDs in inventory instead of names.**  
+The item ID doesn't match the current items list. Contact the server admin.
+
+**What does "Guaranteed Event 5★: yes" mean?**  
+You lost your last 50/50, so your next 5★ is guaranteed to be the event character/weapon.
+
+---
 
 ## Installation
 
-Requirements: .NET SDK 8.0
+Requirements: **.NET SDK 8.0**
+```bash
+git clone https://github.com/YaroslavMudriY1/GenshinWishingUaBot
+```
 
-1. Clone the repository.
-2. Build the solution to restore dependencies.
-3. Change the `appsettings.json` token, bot username and admin id accordingly.
-4. Make sure you use the main database (located in Debug\Release folder*). Sample.db located in main git folder. 
-Path to place database might look like - GenshinWishingUaBot\src\TelegramUI\bin\Debug\net8.0\main.db
-5. Run the project.
+1. Edit `src/TelegramUI/Startup/appsettings.json`:
+```json
+{
+  "Telegram": {
+    "Token": "YOUR_BOT_TOKEN",
+    "BotUsername": "@YourBotUsername",
+    "AdminId": "YOUR_TELEGRAM_USER_ID"
+  },
+  "ConnectionStrings": {
+    "MainDb": "Data Source=main.db"
+  }
+}
+```
+2. Copy `sample.db` to the output directory and rename to `main.db`.  
+   Default path: `src/TelegramUI/bin/Debug/net8.0/main.db`
+3. Build and run the project.
+4. Add the bot to a group chat. **Private chats are not supported** (except `/help`).
+
+---
+
+## Project Structure
+```
+src/TelegramUI/
+├── Commands/         # Business logic (Wish, Inventory, Trade, RankSystem…)
+├── Scheduler/        # Daily reset timers
+├── Startup/          # Config, appsettings
+├── Strings/
+│   ├── General/      # UI strings (en.json, ua.json)
+│   ├── Items/        # Characters & weapons (en.json, ua.json)
+│   ├── Misc/         # Jokes, puns, Paimon responses
+│   └── Ranks/        # Rank titles & messages
+└── Telegram/         # Bot command router (TelegramCommands.cs)
+```
+
+---
 
 ## License
 
-The source code is licensed under Mozilla Public License 2.0.
+Source code: [Mozilla Public License 2.0](LICENSE)  
+Genshin Impact assets © HoYoverse. No copyright infringement intended.
 
-Genshin Impact content and materials are a copyright of miHoYo Co., Ltd. No copyright infringement intended.
-
-Original code belongs to "FrenzyYum". Feel free to mode and upgrade.
-https://github.com/FrenzyYum/GenshinWishingBot
-
-### Version 1.5, made by YMY with GPT-4o, Claude 4 and GitHub Copilot. 
+Original project: [FrenzyYum/GenshinWishingBot](https://github.com/FrenzyYum/GenshinWishingBot)  
+Extended by YMY with assistance from GPT-5.3, Claude 4.6 and GitHub Copilot.

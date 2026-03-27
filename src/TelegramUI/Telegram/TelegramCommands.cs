@@ -641,7 +641,8 @@ namespace TelegramUI.Telegram
                         await Bot.SendTextMessageAsync(
                                        e.Message.Chat.Id,
                                        textsList[17], // "Usage: /sell [amount] <itemId>"
-                                       replyToMessageId: e.Message.MessageId);
+                                       replyToMessageId: e.Message.MessageId,
+                                       parseMode: ParseMode.Html);
                         break;
 
                     case string command when command.StartsWith("/sell "):
@@ -715,7 +716,8 @@ namespace TelegramUI.Telegram
                         await Bot.SendTextMessageAsync(
                                         e.Message.Chat.Id,
                                         textsList[12], // "Usage: /get_id <item_name>"
-                                        replyToMessageId: e.Message.MessageId);
+                                        replyToMessageId: e.Message.MessageId,
+                                        parseMode: ParseMode.Html);
                         break;
                         
                     case string command when command.StartsWith("/get_id "):
@@ -1223,6 +1225,10 @@ namespace TelegramUI.Telegram
                             // ignored
                         }
                     }
+                    else if (lowerMessage.Contains("paimon") || lowerMessage.Contains("паймон"))
+                    {
+                        await Language.RandomPaimonPhrase(e);
+                    }
                     else if (lowerMessage.Contains("emergency") || (lowerMessage.Contains("food")))
                     {
                         try
@@ -1237,6 +1243,63 @@ namespace TelegramUI.Telegram
                         {
                             // ignored
                         }
+                    }
+                    else if (lowerMessage.Contains("qiqi") || lowerMessage.Contains("ціця") || lowerMessage.Contains("чіча"))
+                    {
+                        var responses = new[]
+                        {
+                            "Oh no... The walking pharmacy is back again.",
+                            "First time? ...Um, just now... What was I talking about...",
+                            "Qiqi wants to add you to the list. She already did, but she forgot why.",
+                            "STANDARD BANNER JUMPSCARE 💀"
+                        };
+                        var rnd = new Random();
+                        await Bot.SendTextMessageAsync(e.Message.Chat.Id,
+                            responses[rnd.Next(responses.Length)],
+                            replyToMessageId: e.Message.MessageId);
+                    }
+                    else if (lowerMessage.Contains("bennett") || lowerMessage.Contains("беннет")|| lowerMessage.Contains("бенні"))
+                    {
+                        var responses = new[]
+                        {
+                            "🍀 The happiest loser in Teyvat says hello! ...and immediately trips.",
+                            "Bennett Buff™ — the only reason you haven't given up in the Abyss yet.",
+                            "The Mondstadt Insurance Company declared Bennett persona non grata.",
+                            "Bennett's team consists of three strangers and Bennett himself. Two of them are already injured."
+                        };
+                        var rnd = new Random();
+                        await Bot.SendTextMessageAsync(e.Message.Chat.Id,
+                            responses[rnd.Next(responses.Length)],
+                            replyToMessageId: e.Message.MessageId);
+                    }
+                    else if (lowerMessage.Contains("дід") || lowerMessage.Contains("жонглі") || lowerMessage.Contains("zhongli"))
+                    {
+                        var responses = new[]
+                        {
+                            "There is no mora. But there is a rock.",
+                            "Osmanthus wine tastes the same as I remember... but the wallet isn't what it used to be.",
+                            "Geological consultation: free of charge. The restaurant bill: that's your problem.",
+                            "Old man “forgot” his card at home again. At least for the thirtieth time."
+                        };
+                        var rnd = new Random();
+                        await Bot.SendTextMessageAsync(e.Message.Chat.Id,
+                            responses[rnd.Next(responses.Length)],
+                            replyToMessageId: e.Message.MessageId);
+                    }
+                    else if (lowerMessage.Contains("50/50") || lowerMessage.Contains("50 50") || lowerMessage.Contains("п'ятдесят") ||
+                             lowerMessage.Contains("фіфті")||lowerMessage.Contains("гарант"))
+                    {
+                        var responses = new[]
+                        {
+                            "Statistically? 50/50. Psychologically? A total loss.",
+                            "Heaven: “Let's flip a coin!” Coin: Qiqi.",
+                            "Next time for sure. Always next time.",
+                            "50/50? I'd rather it be 0/100—at least then you know what to expect."
+                        };
+                        var rnd = new Random();
+                        await Bot.SendTextMessageAsync(e.Message.Chat.Id,
+                            responses[rnd.Next(responses.Length)],
+                            replyToMessageId: e.Message.MessageId);
                     }
                     else if (lowerMessage.Contains("ai"))
                     {

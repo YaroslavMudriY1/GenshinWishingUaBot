@@ -232,30 +232,7 @@ namespace TelegramUI.Commands
                 cmd3.Parameters.Add(new SQLiteParameter("@starglitter", starglitterReward));
                 cmd3.ExecuteNonQuery();
             }
-
-            // EXP calculation
-            //var rankResult = RankSystem.AddExperience(message.From.Id, message.Chat.Id, wish.Stars);
-
-/*            if (wish.Stars == 5)
-            {
-                 = 10;
-            }
-            else if (wish.Stars == 4)
-            {
-                expReward = 3;
-            }
-            else if (wish.Stars == 3)
-            {
-                expReward = 1;
-            }
-
-            if (expReward > 0)
-            {
-                cmd3.CommandText = "UPDATE UserRanks SET Experience = Experience + @exp WHERE UserId = @user AND ChatId = @chat";
-                cmd3.Parameters.Add(new SQLiteParameter("@exp", expReward));
-                cmd3.ExecuteNonQuery();
-            }*/
-
+            
             con.Close();
             
             var texts = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.General.{GetLanguage(message)}.json");
