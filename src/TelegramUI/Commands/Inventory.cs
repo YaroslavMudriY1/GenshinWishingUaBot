@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Web;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
 using TelegramUI.Strings.Items;
 using static TelegramUI.Startup.Config;
 using static TelegramUI.Commands.Language;
@@ -139,19 +138,34 @@ namespace TelegramUI.Commands
                 resultArray[2] = resultArray[2].Substring(0, resultArray[2].Length - 2) + "\n\n";
             }
 
-            int totalWishes = 0;
-
-            using (var cmd2 = new SQLiteCommand(con))
+            int totalWishes = 0, fourPity = 0, fivePity = 0, starglitter = 0;
+            bool isEventPity = false;
+            string lastWishTimeFormatted = "N/A"; // If there null in BD, output N/A
+            
+            // Get TotlaWishes, Pities, Starglitter balance, LastWishTime from database 
+            // TODO: Create a handler for database requests
+            using (var cmdStats = new SQLiteCommand(con))
             {
-                cmd2.Parameters.AddWithValue("@userId", userIdToCheck);
-                cmd2.Parameters.AddWithValue("@chatId", message.Chat.Id);
-                cmd2.CommandText = "SELECT TotalWishes FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
+                cmdStats.Parameters.AddWithValue("@userId", userIdToCheck);
+                cmdStats.Parameters.AddWithValue("@chatId", message.Chat.Id);
+                cmdStats.CommandText = @"SELECT TotalWishes, FourPity, FivePity, FiftyLose, 
+                                    Starglitter, LastWishTime 
+                             FROM UsersInChats 
+                             WHERE UserId = @userId AND ChatId = @chatId";
 
-                using (var rdr = cmd2.ExecuteReader())
+                using var rdr = cmdStats.ExecuteReader();
+                if (rdr.Read())
                 {
-                    if (rdr.Read())
+                    totalWishes  = rdr.GetInt32(0);
+                    fourPity     = rdr.GetInt32(1);
+                    fivePity     = rdr.GetInt32(2);
+                    isEventPity  = rdr.GetBoolean(3);
+                    starglitter  = rdr.GetInt32(4);
+                    if (!rdr.IsDBNull(5))
                     {
-                        totalWishes = rdr.GetInt32(0);
+                        var parsed = DateTime.ParseExact(rdr.GetString(5), 
+                            "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        lastWishTimeFormatted = parsed.ToString("HH:mm dd.MM.yyyy");
                     }
                 }
             }
@@ -168,63 +182,7 @@ namespace TelegramUI.Commands
             // Save Pity as variable
             int lastFiveStarPity = 0;
             int lastFourStarPity = 0;
-            bool isEventPity = false;
-
-            //Check if User hit Pity variable
-            using (var cmd3 = new SQLiteCommand(con))
-            {
-                cmd3.Parameters.AddWithValue("@userId", userIdToCheck);
-                cmd3.Parameters.AddWithValue("@chatId", message.Chat.Id);
-                cmd3.CommandText = "SELECT FourPity, FivePity, FiftyLose FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
-
-                using (var rdr = cmd3.ExecuteReader())
-                {
-                    if (rdr.Read())
-                    {
-                        lastFourStarPity = rdr.GetInt32(0);
-                        lastFiveStarPity = rdr.GetInt32(1);
-                        isEventPity = rdr.GetBoolean(2);
-                    }
-                }
-            }
-
-            // Get Starglitter balance
-            int starglitter = 0;
-            using (var cmd4 = new SQLiteCommand(con))
-            {
-                cmd4.Parameters.AddWithValue("@userId", userIdToCheck);
-                cmd4.Parameters.AddWithValue("@chatId", message.Chat.Id);
-                cmd4.CommandText = "SELECT Starglitter FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
-
-                using (var rdr = cmd4.ExecuteReader())
-                {
-                    if (rdr.Read())
-                    {
-                        starglitter = rdr.GetInt32(0);
-                    }
-                }
-            }
-
-            // Get LastWishTime
-            string lastWishTimeFormatted = "N/A"; // If there null in BD, output N/A
-
-            using (var cmd5 = new SQLiteCommand(con))
-            {
-                cmd5.Parameters.AddWithValue("@userId", userIdToCheck);
-                cmd5.Parameters.AddWithValue("@chatId", message.Chat.Id);
-                cmd5.CommandText = "SELECT LastWishTime FROM UsersInChats WHERE UserId = @userId AND ChatId = @chatId";
-
-                using (var rdr = cmd5.ExecuteReader())
-                {
-                    if (rdr.Read() && !rdr.IsDBNull(0))
-                    {
-                        var lastWishTime = rdr.GetString(0);
-                        var parsedTime = DateTime.ParseExact(lastWishTime, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-                        lastWishTimeFormatted = parsedTime.ToString("HH:mm dd.MM.yyyy");
-                    }
-                }
-            }
-
+            
             con.Close();
 
             string eventPity = "";
@@ -247,7 +205,8 @@ namespace TelegramUI.Commands
 
             //Use of Strings/General
             resultArray[4] = string.Format(generalList[6], eventPity, lastFiveStarPity, lastFourStarPity, starglitter, lastWishTimeFormatted);
-
+            
+            //TODO 2: Use existing function for user stats
             var results = resultArray[0] + resultArray[1] + resultArray[2] + resultArray[3] + resultArray[4];
 
             var texts = typeof(Wish).Assembly.GetManifestResourceStream($"TelegramUI.Strings.General.{GetLanguage(message)}.json");
