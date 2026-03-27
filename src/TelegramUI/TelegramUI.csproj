@@ -48,6 +48,8 @@
       <EmbeddedResource Include="Strings\Items\ua.json" />
       <EmbeddedResource Include="Strings\Misc\jokes_en.json" />
       <EmbeddedResource Include="Strings\Misc\jokes_ua.json" />
+      <EmbeddedResource Include="Strings\Misc\puns_en.json" />
+      <EmbeddedResource Include="Strings\Misc\puns_ua.json" />
     </ItemGroup>
 
 </Project>
